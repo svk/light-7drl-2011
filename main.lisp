@@ -28,7 +28,7 @@
 (defconstant +floor-glyph+ (char-code #\ ))
 
 (defconstant +screen-width+ 60)
-(defconstant +screen-height+ 30)
+(defconstant +screen-height+ 40)
 
 (defparameter *tileset-file* "my-tiles.png")
 
@@ -42,9 +42,24 @@
 
 (defparameter *game-initialized* nil)
 
-(defparameter *debug-level* 100)
+(defparameter *debug-level* 50)
 
 (defparameter *game-input-hooks* nil)
+
+(defparameter *game-torch* nil)
+(defparameter *game-brazier* nil)
+
+(defconstant +light-visibility-threshold+ (/ 1 255))
+(defconstant +minimum-fg-light+ 0.3)
+
+(defparameter *cheat-lightall* nil)
+
+
+(defun light-half-life (steps)
+  "Calculate the factor of (exponential) decay required for light intensity to halve at a distance of steps."
+  (/ (- (log 2)) steps))
+
+(defparameter *universal-light-half-life* (light-half-life 4))
 
 (defmacro debug-print (level &rest rest)
   (if (<= level *debug-level*)
@@ -62,7 +77,8 @@
   walkable
   (visible nil)
   (creature nil)
-  (items nil))
+  (items nil)
+  (lighting 0))
 
 (defstruct creature
   appearance
@@ -70,6 +86,83 @@
   (tile nil)
   (xy nil))
 
+
+(defun apply-to-all-tiles (map f)
+  (let ((map-width (car (array-dimensions map)))
+	(map-height (cadr (array-dimensions map))))
+    (dotimes (x map-width)
+      (dotimes (y map-height)
+	(funcall f (aref map x y))))))
+
+(defun apply-to-all-tiles-xy (map f)
+  (let ((map-width (car (array-dimensions map)))
+	(map-height (cadr (array-dimensions map))))
+    (dotimes (x map-width)
+      (dotimes (y map-height)
+	(funcall f (aref map x y) x y)))))
+
+(defun apply-to-all-xy (f)
+  (let ((map-width (car (array-dimensions *game-map*)))
+	(map-height (cadr (array-dimensions *game-map*))))
+    (dotimes (x map-width)
+      (dotimes (y map-height)
+	(funcall f x y)))))
+
+(defun clear-tile-light (tile)
+  (setf (tile-lighting tile) 0))
+
+(defun clear-lighting ()
+  (apply-to-all-tiles *game-map* #'clear-tile-light))
+
+(defun distance (ax ay bx by)
+  (let ((dx (- ax bx))
+	(dy (- ay by)))
+    (sqrt (+ (* dx dx) (* dy dy)))))
+
+(defstruct light-source
+  x
+  y
+  intensity
+  (cached-fov nil))
+
+(defun extract-fov (fov-map)
+  (let ((rv (make-array (array-dimensions *game-map*))))
+    (apply-to-all-xy #'(lambda (x y)
+			 (setf (aref rv x y)
+			       (tcod:map-is-in-fov? fov-map x y))))
+    rv))
+
+(defun move-light-source (source x y)
+  (setf (light-source-cached-fov source) nil
+	(light-source-x source) x
+	(light-source-y source) y))
+
+(defun add-light-from-source (source fov-map &optional (factor *universal-light-half-life*))
+  ;; Physically speaking I'm pretty sure this is supposed to be inverse-square,
+  ;; but that just looks terrible, both gameplay-wise and aesthetically. So
+  ;; light in my game will decay exponentially with distance.
+  (let* ((cx (light-source-x source))
+	 (cy (light-source-y source))
+	 (intensity (light-source-intensity source))
+	 (fov (setf (light-source-cached-fov source)
+		    (or (light-source-cached-fov source)
+			(extract-fov
+			 (progn
+			   (tcod:map-compute-fov fov-map
+					       cx
+					       cy
+					       1000
+					       t
+					       :fov-shadow)
+			   fov-map))))))
+    (apply-to-all-tiles-xy
+     *game-map*
+     #'(lambda (tile x y)
+	 (unless (not (aref fov x y))
+	   (setf (tile-lighting tile)
+		 (+ (tile-lighting tile)
+		    (* intensity (exp (* factor (distance x y cx cy)))))))))))
+  
 (defun creature-can-walk? (creature tile)
   (declare (ignore creature))
   (and
@@ -210,7 +303,10 @@
       (set-tcod-opacity-map *game-map* fov-map)
       (setf terrain-updated nil))
     (unless (not fov-updated)
-      (debug-print 50 "Updating FOV.~%")
+      (debug-print 50 "Updating FOV and lighting.~%")
+      (clear-lighting)
+      (add-light-from-source *game-torch* fov-map)
+      (add-light-from-source *game-brazier* fov-map)
       (tcod:map-compute-fov fov-map
 			    (car (creature-xy *game-player*))
 			    (cdr (creature-xy *game-player*))
@@ -219,8 +315,12 @@
 			    :fov-shadow)
       (dotimes (x map-width)
 	(dotimes (y map-height)
-	  (setf (tile-visible (aref *game-map* x y))
-		(tcod:map-is-in-fov? fov-map x y))))
+	  (let ((tile (tile-at *game-map* x y)))
+	    (debug-print 2000 "Lighting at ~a ~a is ~a.~%" x y (tile-lighting tile))
+	    (setf (tile-visible (aref *game-map* x y))
+		  (and 
+		   (>= (tile-lighting tile) +light-visibility-threshold+)
+		   (tcod:map-is-in-fov? fov-map x y))))))
       (setf fov-updated nil))
     
     (tcod:console-set-default-background tcod:*root* tcod-black)
@@ -228,16 +328,31 @@
     (dotimes (x map-width)
       (dotimes (y map-height)
 	(let* ((tile (aref *game-map* x y))
-	       (appearance (appearance-at tile)))
-	  (unless (not (tile-visible tile))
+	       (appearance (appearance-at tile))
+	       (bg-light (coerce (min 1 (tile-lighting tile)) 'float))
+	       (fg-light (coerce (min 1 (max +minimum-fg-light+
+					     (tile-lighting tile))) 'float))
+	       (visible (tile-visible tile)))
+	  (unless (not (and (= x (player-x))
+			    (= y (player-y))))
+	    (setf visible t))
+	  (unless (not *cheat-lightall*)
+	    (setf visible t
+		  bg-light 1.0
+		  fg-light 1.0))
+	  (unless (not visible)
 	    (tcod:console-put-char-ex tcod:*root*
 				      x
 				      (+ y +ui-top-lines+)
 				      (appearance-glyph appearance)
-				      (apply #'tcod:compose-colour
-					     (appearance-foreground-colour appearance))
-				      (apply #'tcod:compose-colour
-					     (appearance-background-colour appearance)))))))
+				      (tcod:color-multiply-scalar
+				       (apply #'tcod:compose-colour
+					      (appearance-foreground-colour appearance))
+				       fg-light)
+				      (tcod:color-multiply-scalar
+				       (apply #'tcod:compose-colour
+					      (appearance-background-colour appearance))
+				       bg-light))))))
     (tcod:console-flush)
     
     (let* ((key (tcod:console-wait-for-keypress t)))
@@ -269,8 +384,12 @@
 (defun player-took-action ()
   (tick-world))
 
+(defun player-x () (car (creature-xy *game-player*)))
+(defun player-y () (cdr (creature-xy *game-player*)))
+
 (defun try-move-player (dx dy)
   (unless (not (try-move-creature *game-map* *game-player* dx dy))
+    (move-light-source *game-torch* (player-x) (player-y))
     (player-took-action)))
 
 (defun move-command (dx dy)
@@ -299,6 +418,14 @@
 						       :foreground-colour '(255 0 0))
 			  :name "Frederick")
 			 *game-map*))
+    (setf *game-torch* (make-light-source
+			:x (player-x)
+			:y (player-y)
+			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
+    (setf *game-brazier* (make-light-source
+			  :x 2
+			  :y 8
+			  :intensity 1/2))
     (push "Welcome to Light7DRL!" *game-text-buffer*)
     (buffer-show "How pitiful his tale!")
     (buffer-show "How rare his beauty!")))
