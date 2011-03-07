@@ -48,11 +48,18 @@
 
 (defparameter *game-torch* nil)
 (defparameter *game-brazier* nil)
+(defparameter *game-creatures* nil)
 
 (defconstant +light-visibility-threshold+ (/ 1 255))
 (defconstant +minimum-fg-light+ 0.3)
+(defconstant +minimum-touched-light+ 0.1)
 
 (defparameter *cheat-lightall* nil)
+
+(defparameter *directions* (list
+			     (cons -1 -1) (cons 0 -1) (cons 1 -1)
+			     (cons -1 0)              (cons 1 0)
+			     (cons -1 1)  (cons 0 1)  (cons 1 1)))
 
 
 (defun light-half-life (steps)
@@ -83,6 +90,7 @@
 (defstruct creature
   appearance
   name
+  (ai nil)
   (tile nil)
   (xy nil))
 
@@ -170,6 +178,12 @@
    (tile-walkable tile)
    (not (tile-creature tile))))
 
+(defun creature-x (creature)
+  (car (creature-xy creature)))
+
+(defun creature-y (creature)
+  (cdr (creature-xy creature)))
+
 (defun tile-at (map x y)
   (unless (not (array-in-bounds-p map x y))
     (aref map x y)))
@@ -205,7 +219,13 @@
 	 (y (cdr xy)))
     (debug-print 50 "Spawning creature ~a on ~a.~%" creature xy)
     (set-creature-position creature map x y)
+    (push creature *game-creatures*)
     creature))
+
+(defun tick-creatures (list)
+  (dolist (creature list)
+    (unless (null (creature-ai creature))
+      (funcall (creature-ai creature) creature))))
 
 (defun make-wall-tile ()
   (make-tile :appearance (make-appearance :glyph +wall-glyph+
@@ -247,13 +267,18 @@
 		      (= y 0)
 		      (= (+ 1 x) width)
 		      (= (+ 1 y) height))
-		  (make-wall-tile)
+		  (make-floor-tile)
 		  (make-floor-tile)))))
     rv))
 
 (defun create-game-map-test (width height)
   (let ((map (create-game-map width height)))
-    (setf (aref map 10 10) (make-wall-tile))
+    (dotimes (x width)
+      (dotimes (y height)
+	(setf (aref map x y) (if (and (= 0 (random 8))
+				      (< 10 (distance 2 8 x y)))
+				 (make-wall-tile)
+				 (make-floor-tile)))))
     map))
 
 (defun find-walkables (map)
@@ -330,11 +355,18 @@
 	(let* ((tile (aref *game-map* x y))
 	       (appearance (appearance-at tile))
 	       (bg-light (coerce (min 1 (tile-lighting tile)) 'float))
-	       (fg-light (coerce (min 1 (max +minimum-fg-light+
-					     (tile-lighting tile))) 'float))
+	       (fg-light (coerce (min 1 (tile-lighting tile)) 'float))
 	       (visible (tile-visible tile)))
+	  (unless (null (tile-creature tile))
+	    (setf fg-light (coerce (max fg-light +minimum-fg-light+) 'float)))
 	  (unless (not (and (= x (player-x))
 			    (= y (player-y))))
+	    (setf visible t))
+	  (unless (not (and (<= (abs (- x (player-x))) 1)
+			    (<= (abs (- y (player-y))) 1)
+			    (not (tile-walkable tile))))
+	    (setf fg-light (coerce (max fg-light +minimum-touched-light+) 'float))
+	    (setf bg-light (coerce (max bg-light +minimum-touched-light+) 'float))
 	    (setf visible t))
 	  (unless (not *cheat-lightall*)
 	    (setf visible t
@@ -362,6 +394,17 @@
 (defun quit-game ()
     (setf *game-running* nil))
 
+(defun ai-random-walk (creature)
+  (let ((moves (remove-if-not #'(lambda (dxdy)
+				  (creature-can-walk? creature 
+						      (tile-at *game-map*
+							       (+ (creature-x creature) (car dxdy))
+							       (+ (creature-y creature) (cdr dxdy)))))
+			      *directions*)))
+    (unless (null moves)
+      (let ((xy (select-random moves)))
+	(try-move-creature *game-map* creature (car xy) (cdr xy))))))
+
 (defun handle-input (thing)
   (let ((result (assoc thing *game-input-hooks* :test #'equal)))
     (if result
@@ -379,6 +422,7 @@
   (push (cons thing hook) *game-input-hooks*))
 
 (defun tick-world ()
+  (tick-creatures *game-creatures*)
   (debug-print 50 "Ticking.~%"))
 
 (defun player-took-action ()
@@ -406,6 +450,7 @@
   (add-input-hook #\u #'(lambda () (move-command 1 -1)))
   (add-input-hook #\b #'(lambda () (move-command -1 1)))
   (add-input-hook #\n #'(lambda () (move-command 1 1)))
+  (add-input-hook #\V #'(lambda () (setf *cheat-lightall* (not *cheat-lightall*))))
   (add-input-hook #\Q #'quit-game))
 
 (defun initialize-first-game ()
@@ -426,6 +471,12 @@
 			  :x 2
 			  :y 8
 			  :intensity 1/2))
+    (spawn-creature (make-creature
+		     :appearance (make-appearance :glyph (char-code #\~)
+						  :foreground-colour '(0 0 0))
+		     :name "Monster"
+		     :ai #'ai-random-walk)
+		    *game-map*)
     (push "Welcome to Light7DRL!" *game-text-buffer*)
     (buffer-show "How pitiful his tale!")
     (buffer-show "How rare his beauty!")))
@@ -447,7 +498,7 @@
 			    game-title
 			    nil ;; not a fullscreen game
 			    :renderer-sdl)
-    (tcod:console-set-keyboard-repeat 500 100)
+    (tcod:console-set-keyboard-repeat 500 10)
     (reset-standard-input-hooks)
     (debug-print 100 "Entering loop.~%")
     (game-loop)
