@@ -229,7 +229,7 @@
 
 (defun make-wall-tile ()
   (make-tile :appearance (make-appearance :glyph +wall-glyph+
-					  :foreground-colour '(0 0 255)
+					  :foreground-colour '(255 64 0)
 					  :background-colour '(0 0 0))
 	     :opaque t
 	     :walkable nil))
@@ -237,7 +237,7 @@
 (defun make-floor-tile ()
   (make-tile :appearance (make-appearance :glyph +floor-glyph+
 					  :foreground-colour '(255 255 255)
-					  :background-colour '(255 255 255))
+					  :background-colour '(255 255 64))
 	     :opaque nil
 	     :walkable t))
 
@@ -385,6 +385,22 @@
 				       (apply #'tcod:compose-colour
 					      (appearance-background-colour appearance))
 				       bg-light))))))
+    
+    (let ((y-offset 0))
+      (tcod:console-set-default-background tcod:*root*
+					   (tcod:compose-colour 0 0 0))
+      (tcod:console-set-default-foreground tcod:*root*
+					   (tcod:compose-colour 0 255 255))
+      (dolist (entry (reverse *game-text-buffer*))
+	(incf y-offset (tcod:console-print-rect-ex tcod:*root*
+						   0
+						   y-offset
+						   +screen-width+
+						   (- +ui-top-lines+ y-offset)
+						   :set
+						   :left
+						   entry))))
+    (setf *game-text-buffer* nil)
     (tcod:console-flush)
     
     (let* ((key (tcod:console-wait-for-keypress t)))
@@ -460,7 +476,7 @@
     (setf *game-player* (spawn-creature 
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
-						       :foreground-colour '(255 0 0))
+						       :foreground-colour '(0 0 255))
 			  :name "Frederick")
 			 *game-map*))
     (setf *game-torch* (make-light-source
