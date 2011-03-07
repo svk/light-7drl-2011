@@ -448,9 +448,16 @@
 (defun player-y () (cdr (creature-xy *game-player*)))
 
 (defun try-move-player (dx dy)
-  (unless (not (try-move-creature *game-map* *game-player* dx dy))
-    (move-light-source *game-torch* (player-x) (player-y))
-    (player-took-action)))
+  (let ((target (tile-at *game-map* (+ (player-x) dx) (+ (player-y) dy))))
+    (cond
+      ((or (null target) (not (tile-walkable target)))
+       (buffer-show "The way is blocked."))
+      ((not (null (tile-creature target)))
+       (buffer-show "There's something in the way, and ~a is a pacifist." (creature-name *game-player*)))
+      (t 
+       (unless (not (try-move-creature *game-map* *game-player* dx dy))
+	 (move-light-source *game-torch* (player-x) (player-y))
+	 (player-took-action))))))
 
 (defun move-command (dx dy)
   ;; Later, we might not be moving the player, but, say, a cursor.
