@@ -33,7 +33,7 @@
 (defparameter *tileset-file* "my-tiles.png")
 
 (defconstant +ui-top-lines+ 3)
-(defconstant +ui-bottom-lines+ 2)
+(defconstant +ui-bottom-lines+ 1)
 
 (defparameter *game-map* nil)
 (defparameter *game-player* nil)
@@ -90,6 +90,8 @@
 (defstruct creature
   appearance
   name
+  hp
+  max-hp
   (ai nil)
   (tile nil)
   (xy nil))
@@ -400,12 +402,30 @@
 						   :set
 						   :left
 						   entry))))
+    (tcod:console-set-default-background tcod:*root*
+					 (tcod:compose-colour 0 0 0))
+    (tcod:console-set-default-foreground tcod:*root*
+					 (tcod:compose-colour 255 255 255))
+    (tcod:console-print-ex tcod:*root*
+			   0
+			   (- +screen-height+ +ui-bottom-lines+)
+			   :set
+			   :left
+			   (make-statusline))
     (setf *game-text-buffer* nil)
+    
     (tcod:console-flush)
     
     (let* ((key (tcod:console-wait-for-keypress t)))
       (handle-keyboard-input key)))
   (terminate))
+
+(defun make-statusline ()
+  (format nil "~a [~a/~a]"
+	  (creature-name *game-player*)
+	  (creature-hp *game-player*)
+	  (creature-max-hp *game-player*)))
+	  
 
 (defun quit-game ()
     (setf *game-running* nil))
@@ -484,7 +504,9 @@
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
 						       :foreground-colour '(0 0 255))
-			  :name "Frederick")
+			  :name "Frederick"
+			  :hp 20
+			  :max-hp 20)
 			 *game-map*))
     (setf *game-torch* (make-light-source
 			:x (player-x)
@@ -493,11 +515,13 @@
     (setf *game-brazier* (make-light-source
 			  :x 2
 			  :y 8
-			  :intensity 1/2))
+			  :intensity 0.9))
     (spawn-creature (make-creature
 		     :appearance (make-appearance :glyph (char-code #\~)
 						  :foreground-colour '(0 0 0))
 		     :name "Monster"
+		     :hp 10
+		     :max-hp 10
 		     :ai #'ai-random-walk)
 		    *game-map*)
     (push "Welcome to Light7DRL!" *game-text-buffer*)
