@@ -10,6 +10,7 @@
 		 :ai ai))
 
 (defmethod set-position ((creature creature) x y level)
+  (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (creature-level creature) x y level)
   (unless (not (null level))
     (setf level (creature-level creature)))
   (unless (eq (creature-level creature) level)
@@ -58,10 +59,13 @@
        (is-in-fov? target (get-fov observer))))
 
 (defmethod remove-from-map ((creature creature))
-  (with-slots (level)
-      creature
+  (let ((level (creature-level creature)))
+    (debug-print 10 "Removing creature ~a from ~a.~%" creature level)
     (unless (null level)
+      (debug-print 10 "Removed creature. Left on map: ~a." (level-creatures level))
       (setf (level-creatures level) (remove creature (level-creatures level))))
+    (setf (creature-level creature) nil)
+    (debug-print 10 "Did remove creature now at ~a.~%" (creature-level creature))
     (unless (null (creature-tile creature))
       (setf (tile-creature (creature-tile creature)) nil))))
 

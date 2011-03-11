@@ -136,6 +136,7 @@
 	 (y (cdr xy)))
     (debug-print 50 "Spawning creature ~a on ~a.~%" creature xy)
     (set-position creature x y level)
+    (debug-print 50 "Newly spawned creature on ~a.~%" (creature-level creature))
     creature))
 
 (defun tick-creatures (list)
@@ -306,10 +307,9 @@
       ((not (null (tile-creature target)))
        (let* ((creature (tile-creature target))
 	      (c-name (creature-name creature)))
-	 (buffer-show "There's ~a in the way, and ~a doesn't want to hurt ~a."
-		      (indefinite-noun c-name)
-		      (definite-noun (creature-name *game-player*))
-		      (third-person-singular (creature-gender creature)))))
+	 (buffer-show-cap
+	  "~a ~a!" (inoun-verbs n-you v-kill) (definite-noun (creature-name creature)))
+	 (remove-from-map creature)))
       (t 
        (let ((old-tile (creature-tile *game-player*))
 	     (new-tile (try-move-creature *game-player* dx dy)))
