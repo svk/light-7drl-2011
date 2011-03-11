@@ -287,18 +287,18 @@
 
 (defun try-player-pick-up (item)
   (unless (null (creature-pick-up *game-player* item))
-    (buffer-show "You pick up the ~a." (item-name item))))
+    (buffer-show "You pick up ~a." (definite-noun (item-name item)))))
 
 (defun try-player-drop (item &optional (confirmed nil))
   (cond
     ((and (not confirmed)
 	  (tile-dark (creature-tile *game-player*)))
      (query-confirm (format nil
-			    "Really drop the ~a in complete darkness? It might be hard to retrieve it."
-			    (item-name item))
+			    "Really drop ~a in complete darkness? It might be hard to retrieve it."
+			    (definite-noun (item-name item)))
 		    #'(lambda () (try-player-drop item t))))
     (t (unless (null (creature-drop *game-player* item))
-	 (buffer-show "You drop the ~a." (item-name item))))))
+	 (buffer-show "You drop ~a." (definite-noun (item-name item)))))))
 
 (defun try-player-drop-stack ()
   (if (null (creature-items *game-player*))
@@ -337,7 +337,15 @@
 	   (player-took-action)))))))
 
 (defun summarize-floor-items (items)
-  "There are items here.")
+  (let* ((countlist (make-count-list (mapcar #'item-name items)))
+	 (total (reduce #'+ (mapcar #'cdr countlist)))
+	 (stringlist (mapcar #'(lambda (noun-count)
+				(indefinite-counted-noun (car noun-count)
+							 (cdr noun-count)))
+			     countlist)))
+    (if (null stringlist)
+	(format nil "There's nothing here.")
+	(format nil "There ~a ~a here." (is-are total) (list-join stringlist)))))
   
 (defun initialize-first-game ()
   (query-string
@@ -376,12 +384,27 @@
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
 							   :foreground-colour '(0 0 0))
-			      :name "sword"
+			      :name n-sword
 			      :size 1))
     (debug-print 50 "Printing welcome messages.~%")
     (buffer-show "Welcome to Light7DRL!")
     (buffer-show "How pitiful his tale!")
     (buffer-show "How rare his beauty!")
     (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)))
+
+(defun cheat-spawn-thingy ()
+  (creature-give *game-player*
+		 (make-item :appearance (make-appearance :glyph +weapon-glyph+
+							 :foreground-colour '(0 0 0))
+			    :name n-goose
+			    :size 1)))
+
+(defun cheat-spawn-doodad ()
+  (creature-give *game-player*
+		 (make-item :appearance (make-appearance :glyph +weapon-glyph+
+							 :foreground-colour '(0 0 0))
+			    :name n-child
+			    :size 1)))
+
 
 

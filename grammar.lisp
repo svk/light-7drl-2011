@@ -63,6 +63,12 @@
 	(t
 	 (noun-prefix-with-definite-article noun (format nil "~a ~a" (english-number count) (noun-plural noun))))))
 
+(defun definite-noun (noun)
+  (noun-prefix-with-definite-article noun (noun-singular noun)))
+
+(defun indefinite-noun (noun)
+  (noun-prefix-with-indefinite-article noun (noun-singular noun)))
+
 (defun is-are (count)
   (if (= count 1)
       "is"
@@ -77,10 +83,26 @@
   (do* ((rv nil)
 	(more-things things (cdr more-things))
 	(thing (car more-things) (car more-things))
-	(entry (assoc thing rv :test #'equal)))
+	(entry (assoc thing rv :test #'equal)  (assoc thing rv :test #'equal)))
        ((null more-things) rv)
     (if entry
 	(incf (cdr entry))
 	(push (cons thing 1) rv))))
+
+(defmethod print-object ((object noun) stream)
+  (format stream "[~a]" (noun-singular object)))
+
+(defun list-join (strings)
+  (with-output-to-string (out)
+    (do ((count (length strings) (- count 1))
+	 (more-strings strings (cdr more-strings)))
+	((zerop count))
+      (format out "~a" (car more-strings))
+      (case count
+	(1)
+	(2 (format out " and "))
+	(t (format out ", "))))))
+
+
     
 
