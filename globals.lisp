@@ -57,7 +57,16 @@
 (defparameter *game-input-hooks-stack* nil)
 
 (defun buffer-show (&rest rest)
-  (push (apply #'format (cons nil rest)) *game-text-buffer*))
+  (let ((string (apply #'format (cons nil rest))))
+    (if (equal (caar *game-text-buffer*) string)
+	(incf (cdar *game-text-buffer*))
+	(push (cons string 1) *game-text-buffer*))))
+
+(defparameter *buffer-clear-time* nil)
+
+(defun buffer-clear ()
+  (setf *game-text-buffer* nil
+	*buffer-clear-time* nil))
 
 (defun push-hooks (hooks)
   (debug-print 40 "Pushing new hooks.~%")
@@ -71,15 +80,57 @@
 
 (defun query-confirm (question f-yes &optional (f-no nil))
   (debug-print 10 "Asking to confirm query: ~a~%" question)
+  (buffer-clear)
   (buffer-show "~a [y/n]" question)
   (push-hooks #'(lambda (value stack)
 		  (declare (ignore stack))
 		  (case value
-		    (#\y (funcall f-yes)
+		    (#\y (buffer-clear)
+			 (funcall f-yes)
 			 (pop-hooks))
-		    (#\n (unless (null f-no)
+		    (#\n (buffer-clear)
+			 (unless (null f-no)
 			   (funcall f-no))
 			 (pop-hooks))
-		    (t (buffer-show "~a [y/n]" question))))))
+		    (t
+		     (buffer-clear)
+		     (buffer-show "~a [y/n]" question))))))
 
+(defun any-nonempty (s)
+  (if (zerop (length s))
+      nil
+      s))
 
+(defun query-string (description f-string &key (filter #'identity) (limit nil) (accept #'any-nonempty))
+  (let ((buffer nil))
+    (defun make-buffer-string ()
+      (let ((rv (make-array 0
+			    :element-type 'character
+			    :fill-pointer 0
+			    :adjustable t)))
+	(dolist (ch (reverse buffer))
+	  (vector-push-extend ch rv))
+	rv))
+    (debug-print 50 "Querying for string (~a).~%" description)
+    (buffer-show "~a~a_" description (make-buffer-string))
+    (push-hooks #'(lambda (value stack)
+		    (let ((exiting nil))
+		      (declare (ignore stack))
+		      (setf value (funcall filter value))
+		      (cond 
+			((eq value :backspace)
+			 (pop buffer))
+			((eq value :enter)
+			 (let ((s (reverse buffer)))
+			   (unless (not (funcall accept s))
+			     (pop-hooks)
+			     (buffer-clear)
+			     (setf exiting t)
+			     (funcall f-string (make-buffer-string)))))
+			((characterp value)
+			 (push value buffer))
+			(t (debug-print 50 "Going unhandled in query: ~a.~%" value)
+			 (debug-print 100 "Vs backspace: ~a ~a ~a ~a~%" value 'backspace (eq value 'backspace) (type-of value))))
+		      (unless exiting
+			(buffer-clear)
+			(buffer-show "~a~a_" description (make-buffer-string))))))))

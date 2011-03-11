@@ -253,6 +253,7 @@
   (debug-print 50 "Ticking.~%"))
 
 (defun player-took-action ()
+  (setf *buffer-clear-time* t)
   (tick-world))
 
 (defun player-x () (car (creature-xy *game-player*)))
@@ -329,6 +330,12 @@
 	   (player-took-action)))))))
 
 (defun initialize-first-game ()
+  (query-string
+   "Enter your name:"
+   #'(lambda (player-name)
+       (initialize-first-game-with-info player-name))))
+
+(defun initialize-first-game-with-info (player-name)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
     (setf *game-map* (create-game-map-test map-width map-height))
@@ -336,7 +343,7 @@
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
 						       :foreground-colour '(0 0 255))
-			  :name "Frederick"
+			  :name player-name
 			  :hp 20
 			  :max-hp 20)
 			 *game-map*))
@@ -361,8 +368,10 @@
 							   :foreground-colour '(0 0 0))
 			      :name "sword"
 			      :size 1))
-    (push "Welcome to Light7DRL!" *game-text-buffer*)
+    (debug-print 50 "Printing welcome messages.~%")
+    (buffer-show "Welcome to Light7DRL!")
     (buffer-show "How pitiful his tale!")
-    (buffer-show "How rare his beauty!")))
+    (buffer-show "How rare his beauty!")
+    (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)))
 
 
