@@ -242,6 +242,7 @@
   (select-random (find-walkables map)))
 
 (defun ai-random-walk (creature)
+  (debug-print 50 "AI random-walk triggers on ~a." (creature-name creature))
   (let ((moves (remove-if-not #'(lambda (dxdy)
 				  (creature-can-walk? creature 
 						      (tile-at (creature-level creature)
@@ -253,7 +254,7 @@
 	(try-move-creature creature (car xy) (cdr xy))))))
 
 (defun tick-world ()
-  (tick-creatures *game-creatures*)
+  (tick-creatures (level-creatures *game-current-level*))
   (debug-print 50 "Ticking.~%"))
 
 (defun player-took-action ()
@@ -331,8 +332,13 @@
 		 ((and (not (tile-dark old-tile))
 		       (tile-dark new-tile))
 		  (buffer-show "You stumble into the darkness.")))
+	   (unless (null (tile-items new-tile))
+	     (buffer-show (summarize-floor-items (tile-items new-tile))))
 	   (player-took-action)))))))
 
+(defun summarize-floor-items (items)
+  "There are items here.")
+  
 (defun initialize-first-game ()
   (query-string
    "Enter your name:"
