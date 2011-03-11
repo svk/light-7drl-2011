@@ -22,12 +22,19 @@
   (ai nil)
   (tile nil)
   (xy nil)
-  (items nil))
+  (items nil)
+  (level nil))
 
 (defstruct item
   appearance
   name
   size)
+
+(defstruct level
+  width
+  height
+  tiles
+  (creatures nil))
 
 (defstruct light-source
   x
@@ -36,31 +43,25 @@
   (cached-fov nil))
 
 (defun apply-to-all-tiles (map f)
-  (let ((map-width (car (array-dimensions map)))
-	(map-height (cadr (array-dimensions map))))
-    (dotimes (x map-width)
-      (dotimes (y map-height)
-	(funcall f (aref map x y))))))
+  (dotimes (x (level-width map))
+    (dotimes (y (level-height map))
+      (funcall f (aref (level-tiles map) x y)))))
 
 (defun apply-to-all-tiles-xy (map f)
-  (let ((map-width (car (array-dimensions map)))
-	(map-height (cadr (array-dimensions map))))
-    (dotimes (x map-width)
-      (dotimes (y map-height)
-	(funcall f (aref map x y) x y)))))
+  (dotimes (x (level-width map))
+    (dotimes (y (level-height map))
+      (funcall f (aref (level-tiles map) x y) x y))))
 
 (defun apply-to-all-xy (f)
-  (let ((map-width (car (array-dimensions *game-map*)))
-	(map-height (cadr (array-dimensions *game-map*))))
-    (dotimes (x map-width)
-      (dotimes (y map-height)
-	(funcall f x y)))))
+  (dotimes (x (level-width *game-current-level*))
+    (dotimes (y (level-height *game-current-level*))
+      (funcall f x y))))
 
 (defun clear-tile-light (tile)
   (setf (tile-lighting tile) 0))
 
-(defun clear-lighting ()
-  (apply-to-all-tiles *game-map* #'clear-tile-light))
+(defun clear-lighting (&optional (level *game-current-level*))
+  (apply-to-all-tiles level #'clear-tile-light))
 
 (defun distance (ax ay bx by)
   (let ((dx (- ax bx))
@@ -68,7 +69,7 @@
     (sqrt (+ (* dx dx) (* dy dy)))))
 
 (defun extract-fov (fov-map)
-  (let ((rv (make-array (array-dimensions *game-map*))))
+  (let ((rv (make-array (array-dimensions (level-tiles *game-current-level*)))))
     (apply-to-all-xy #'(lambda (x y)
 			 (setf (aref rv x y)
 			       (tcod:map-is-in-fov? fov-map x y))))
@@ -98,7 +99,7 @@
 					       :fov-shadow)
 			   fov-map))))))
     (apply-to-all-tiles-xy
-     *game-map*
+     *game-current-level*
      #'(lambda (tile x y)
 	 (unless (not (aref fov x y))
 	   (setf (tile-lighting tile)
@@ -118,42 +119,41 @@
 (defun creature-y (creature)
   (cdr (creature-xy creature)))
 
-(defun tile-at (map x y)
-  (unless (not (array-in-bounds-p map x y))
-    (aref map x y)))
+(defun tile-at (level x y)
+  (let ((map (level-tiles level)))
+    (unless (not (array-in-bounds-p map x y))
+      (aref map x y))))
 
-(defun try-move-creature (map creature dx dy)
-  (let* ((xy (creature-xy creature))
+(defun try-move-creature (creature dx dy)
+  (let* ((level (creature-level creature))
+	 (xy (creature-xy creature))
 	 (x (car xy))
 	 (y (cdr xy))
 	 (xp (+ x dx))
 	 (yp (+ y dy))
-	 (tile (tile-at map xp yp)))
+	 (tile (tile-at level xp yp))
+	 (map (level-tiles level)))
     (unless (not (creature-can-walk? creature tile))
-      (set-creature-position creature map xp yp)
+      (set-creature-position creature level xp yp)
       tile)))
 
-(defun remove-creature-from-map (map creature)
+(defun set-creature-position (creature level x y)
   (unless (null (creature-tile creature))
     (setf (tile-creature (creature-tile creature)) nil))
-  (setf (creature-tile creature) nil
-	(creature-xy creature) nil))
-
-(defun set-creature-position (creature map x y)
-  (remove-creature-from-map map creature)
-  (setf (tile-creature (tile-at map x y)) creature
+  (setf (tile-creature (tile-at level x y)) creature
+	(creature-level creature) level
 	(creature-xy creature) (cons x y)
-	(creature-tile creature) (tile-at map x y)))
+	(creature-tile creature) (tile-at level x y)))
 
-(defun spawn-creature (creature map)
+(defun spawn-creature (creature level)
   (let* ((xy (select-random 
-	     (remove-if-not #'(lambda (xy) (creature-can-walk? creature (aref map (car xy) (cdr xy))))
-			    (find-walkables map))))
+	     (remove-if-not #'(lambda (xy) (creature-can-walk? creature (tile-at level (car xy) (cdr xy))))
+			    (find-walkables level))))
 	 (x (car xy))
 	 (y (cdr xy)))
     (debug-print 50 "Spawning creature ~a on ~a.~%" creature xy)
-    (set-creature-position creature map x y)
-    (push creature *game-creatures*)
+    (set-creature-position creature level x y)
+    (push creature (level-creatures level))
     creature))
 
 (defun tick-creatures (list)
@@ -198,11 +198,15 @@
        (tile-appearance tile))))
   (tile-appearance tile))
 
-(defun create-game-map (width height)
-  (let ((rv (make-array (list width height))))
+(defun create-level (width height)
+  (let ((rv (make-level :width width
+	      :height height
+	      :tiles (make-array (list width height)
+				 :initial-element (make-floor-tile))
+	      :creatures nil)))
     (dotimes (x width)
       (dotimes (y height)
-	(setf (aref rv x y)
+	(setf (aref (level-tiles rv) x y)
 	      (if (or (= x 0)
 		      (= y 0)
 		      (= (+ 1 x) width)
@@ -211,24 +215,24 @@
 		  (make-floor-tile)))))
     rv))
 
-(defun create-game-map-test (width height)
-  (let ((map (create-game-map width height)))
+(defun create-level-test (width height)
+  (let ((level (create-level width height)))
     (dotimes (x width)
       (dotimes (y height)
-	(setf (aref map x y) (if (and (= 0 (random 8))
-				      (< 10 (distance 2 8 x y)))
-				 (make-wall-tile)
-				 (make-floor-tile)))))
-    map))
+	(setf (aref (level-tiles level) x y) (if (and (= 0 (random 8))
+					   (< 10 (distance 2 8 x y)))
+				      (make-wall-tile)
+				      (make-floor-tile)))))
+    level))
 
-(defun find-walkables (map)
-  (do* ((width (car (array-dimensions map)))
-	(height (cadr (array-dimensions map)))
+(defun find-walkables (level)
+  (do* ((width (level-width level))
+	(height (level-height level))
 	(x 0 (+ x 1))
 	(rv nil))
        ((>= x width) rv)
     (dotimes (y height)
-      (unless (not (tile-walkable (aref map x y)))
+      (unless (not (tile-walkable (aref (level-tiles level) x y)))
 	(push (cons x y) rv)))))
 
 (defun select-random (list)
@@ -240,13 +244,13 @@
 (defun ai-random-walk (creature)
   (let ((moves (remove-if-not #'(lambda (dxdy)
 				  (creature-can-walk? creature 
-						      (tile-at *game-map*
+						      (tile-at (creature-level creature)
 							       (+ (creature-x creature) (car dxdy))
 							       (+ (creature-y creature) (cdr dxdy)))))
 			      *directions*)))
     (unless (null moves)
       (let ((xy (select-random moves)))
-	(try-move-creature *game-map* creature (car xy) (cdr xy))))))
+	(try-move-creature creature (car xy) (cdr xy))))))
 
 (defun tick-world ()
   (tick-creatures *game-creatures*)
@@ -301,7 +305,7 @@
       (try-player-drop (car (creature-items *game-player*)))))
 
 (defun try-player-pick-up-stack ()
-  (let ((tile (tile-at *game-map* (player-x) (player-y))))
+  (let ((tile (tile-at *game-current-level* (player-x) (player-y))))
     (cond
       ((not (tile-visible (creature-tile *game-player*)))
        (buffer-show "It's too dark to make out any items on the floor here."))
@@ -310,7 +314,7 @@
       (t (try-player-pick-up (car (tile-items tile)))))))
 
 (defun try-move-player (dx dy)
-  (let ((target (tile-at *game-map* (+ (player-x) dx) (+ (player-y) dy))))
+  (let ((target (tile-at *game-current-level* (+ (player-x) dx) (+ (player-y) dy))))
     (cond
       ((or (null target) (not (tile-walkable target)))
        (buffer-show "The way is blocked."))
@@ -318,7 +322,7 @@
        (buffer-show "There's something in the way, and ~a is a pacifist." (creature-name *game-player*)))
       (t 
        (let ((old-tile (creature-tile *game-player*))
-	     (new-tile (try-move-creature *game-map* *game-player* dx dy)))
+	     (new-tile (try-move-creature *game-player* dx dy)))
 	 (unless (not new-tile)
 	   (move-light-source *game-torch* (player-x) (player-y))
 	   (cond ((and (tile-dark old-tile)
@@ -338,7 +342,7 @@
 (defun initialize-first-game-with-info (player-name)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
-    (setf *game-map* (create-game-map-test map-width map-height))
+    (setf *game-current-level* (create-level-test map-width map-height))
     (setf *game-player* (spawn-creature 
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
@@ -346,7 +350,7 @@
 			  :name player-name
 			  :hp 20
 			  :max-hp 20)
-			 *game-map*))
+			 *game-current-level*))
     (setf *game-torch* (make-light-source
 			:x (player-x)
 			:y (player-y)
@@ -362,7 +366,7 @@
 		     :hp 10
 		     :max-hp 10
 		     :ai #'ai-random-walk)
-		    *game-map*)
+		    *game-current-level*)
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
 							   :foreground-colour '(0 0 0))

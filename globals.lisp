@@ -26,7 +26,8 @@
 (defconstant +ui-top-lines+ 3)
 (defconstant +ui-bottom-lines+ 2)
 
-(defparameter *game-map* nil)
+(defparameter *game-current-level* nil)
+
 (defparameter *game-player* nil)
 (defparameter *game-running* nil)
 (defparameter *game-text-buffer* nil)
