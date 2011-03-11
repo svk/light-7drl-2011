@@ -144,8 +144,9 @@
 
     (debug-print 100 "Before input, game-text-buffer is: ~a.~%" *game-text-buffer*)
 
-    (let* ((key (tcod:console-wait-for-keypress t)))
-      (handle-keyboard-input key))
+    (ignore-errors ;; pressing international chars causes cl-tcod to break
+      (let* ((key (tcod:console-wait-for-keypress t)))
+	(handle-keyboard-input key)))
 
     (debug-print 100 "Game-text-buffer is now: ~a.~%" *game-text-buffer*))
 

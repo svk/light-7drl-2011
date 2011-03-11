@@ -24,6 +24,7 @@
   height
   tiles
   (creatures nil)
+  (floor-items nil)
   (obstacle-map nil)
   (obstacle-map-updated nil))
 
