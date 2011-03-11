@@ -156,8 +156,41 @@
 		 (aref arr (+ x0 dx) (+ y0 dy))
 		 (aref room dx dy))))))))
 
+(defun ca-stabilize (array f)
+  (do ((next-array (make-array (array-dimensions array)))
+	(unstable t))
+      ((not unstable) array)
+    (setf unstable nil)
+    (dotimes (x (car (array-dimensions array)))
+      (dotimes (y (cadr (array-dimensions array)))
+	(let* ((old-cell (aref array x y))
+	       (new-cell (funcall
+			  f
+			  old-cell
+			  (mapcar #'(lambda (xy)
+				      (aref array (car xy) (cdr xy)))
+				  (remove-if-not #'(lambda (xy)
+						     (array-in-bounds-p array (car xy) (cdr xy)))
+						 (neighbours-of x y))))))
+	  (setf unstable (or unstable
+			     (not (equal old-cell new-cell)))
+		(aref next-array x y) new-cell))))
+    (setf array next-array)))
+
+(defun count-walls (neighbours)
+  (length (remove-if-not #'(lambda (nb) (eql +sketch-wall+ nb)) neighbours)))
+
+(defun ca-remove-islands (array)
+  (flet ((f (old-cell neighbours)
+	   (if (and (equal old-cell +sketch-wall+)
+		    (> (count-walls neighbours) 1))
+	       +sketch-wall+
+	       +sketch-floor+)))
+    (ca-stabilize array #'f)))
+
 (defun generate-cave (width height)
-  (coordinates->array
-   (pollock-generator width height 1/2 #'(lambda () (drunken-walks 10 10)))
-   width
-   height))
+  (ca-remove-islands
+   (coordinates->array
+    (pollock-generator width height 1/2 #'(lambda () (drunken-walks 10 10)))
+    width
+    height)))

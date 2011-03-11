@@ -307,7 +307,7 @@
 	   (mapcar #'(lambda (i) (nth i list)) rv-indices))
 	(pushnew (random (length list)) rv-indices))))
 
-(defun generate-light-source-cover (level intensity-gen target &optional (estimate nil))
+(defun generate-light-source-cover (level intensity-gen &optional (target 1) (estimate nil))
   ;; Greedy algo, v likely nonoptimal but should be fine for common cases
   ;; (Even the one that's not an "estimate" is still not guaranteed optimal!
   (let* ((all-xys (find-walkables level))
