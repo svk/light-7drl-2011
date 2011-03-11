@@ -44,7 +44,8 @@
 	    (debug-print 50 "Updating FOV and lighting.~%")
 	    (clear-lighting)
 	    (add-light-from-source *game-torch* fov-map)
-	    (add-light-from-source *game-brazier* fov-map)
+	    (dolist (brazier *game-braziers*)
+	      (add-light-from-source brazier fov-map))
 	    (tcod:map-compute-fov fov-map
 				  (car (creature-xy *game-player*))
 				  (cdr (creature-xy *game-player*))

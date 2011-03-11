@@ -35,8 +35,11 @@
 (defparameter *game-initialized* nil)
 
 (defparameter *game-torch* nil)
-(defparameter *game-brazier* nil)
+(defparameter *game-braziers* nil)
 (defparameter *game-creatures* nil)
+
+(defmacro const (x)
+  `#'(lambda () ,x))
 
 (defconstant +light-visibility-threshold+ (/ 1 255))
 (defconstant +minimum-fg-light+ 0.3)
@@ -48,6 +51,17 @@
 			     (cons -1 -1) (cons 0 -1) (cons 1 -1)
 			     (cons -1 0)              (cons 1 0)
 			     (cons -1 1)  (cons 0 1)  (cons 1 1)))
+
+(defparameter *cardinal-directions* (list
+			                  (cons 0 -1)            
+			     (cons -1 0)              (cons 1 0)
+			                  (cons 0 1)))
+
+(defun neighbours-of (x y)
+  (mapcar #'(lambda (xy) (cons (+ x (car xy)) (+ y (cdr xy)))) *directions*))
+
+(defun cardinal-neighbours-of (x y)
+  (mapcar #'(lambda (xy) (cons (+ x (car xy)) (+ y (cdr xy)))) *cardinal-directions*))
 
 (defun light-half-life (steps)
   "Calculate the factor of (exponential) decay required for light intensity to halve at a distance of steps."
@@ -160,3 +174,6 @@
 		      (unless exiting
 			(buffer-clear)
 			(buffer-show "~a~a_" description (make-buffer-string))))))))
+
+(defun select-random (list)
+  (nth (random (length list)) list))

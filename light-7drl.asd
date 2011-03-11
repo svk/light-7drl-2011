@@ -7,6 +7,8 @@
 			:depends-on ("grammar" "package"))
 		 (:file "world-structs"
 			:depends-on ("package"))
+		 (:file "dungeon"
+			:depends-on ("package"))
 		 (:file "creature"
 			:depends-on ("world-structs" "grammar" "package" "globals"))
 		 (:file "world"

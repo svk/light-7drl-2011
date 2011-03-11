@@ -8,6 +8,9 @@
 (defmethod print-object ((level level) stream)
     (format stream "[Level]"))
 
+(defmethod print-object ((ls light-source) stream)
+    (format stream "[light source at ~a ~a]" (light-source-x ls) (light-source-y ls)))
+
 (defun set-tcod-opacity-map (map fov-map)
   (let ((width (car (array-dimensions map)))
 	(height (cadr (array-dimensions map))))
@@ -64,6 +67,20 @@
     (apply-to-all-xy #'(lambda (x y)
 			 (setf (aref rv x y)
 			       (tcod:map-is-in-fov? fov-map x y))))
+    rv))
+
+(defun extract-fov-coordinates (fov-map)
+  (let ((rv nil))
+    (apply-to-all-xy #'(lambda (x y)
+			 (unless (not (tcod:map-is-in-fov? fov-map x y))
+			   (push (list x y) rv))))
+    rv))
+
+(defun extract-fov-xys (fov-map)
+  (let ((rv nil))
+    (apply-to-all-xy #'(lambda (x y)
+			 (unless (not (tcod:map-is-in-fov? fov-map x y))
+			   (push (cons x y) rv))))
     rv))
 
 (defun move-light-source (source x y)
@@ -210,6 +227,21 @@
 				      (make-floor-tile)))))
     level))
 
+(defun create-level-generated (width height)
+  (let ((level (create-level width height))
+	(sketch (generate-cave (- width 2) (- height 2))))
+    (format t "~a" sketch)
+    (dotimes (x width)
+      (dotimes (y height)
+	(setf (aref (level-tiles level) x y)
+	      (cond
+		((not (array-in-bounds-p sketch (- x 1) (- y 1)))
+		 (make-wall-tile))
+		((eql +sketch-floor+ (aref sketch (- x 1) (- y 1))) (make-floor-tile))
+		(t (make-wall-tile))))))
+    level))
+      
+
 (defun find-walkables (level)
   (do* ((width (level-width level))
 	(height (level-height level))
@@ -219,9 +251,6 @@
     (dotimes (y height)
       (unless (not (tile-walkable (aref (level-tiles level) x y)))
 	(push (cons x y) rv)))))
-
-(defun select-random (list)
-  (nth (random (length list)) list))
 
 (defun find-random-walkable (map)
   (select-random (find-walkables map)))
@@ -269,6 +298,72 @@
   (unless (null (creature-take creature item))
     (push item (tile-items (creature-tile creature)))
     item))
+
+(defun select-n-random (n list)
+  (if (<= (length list) n)
+      list
+      (do ((rv-indices nil))
+	  ((>= (length rv-indices) n)
+	   (mapcar #'(lambda (i) (nth i list)) rv-indices))
+	(pushnew (random (length list)) rv-indices))))
+
+(defun generate-light-source-cover (level intensity-gen target &optional (estimate nil))
+  ;; Greedy algo, v likely nonoptimal but should be fine for common cases
+  ;; (Even the one that's not an "estimate" is still not guaranteed optimal!
+  (let* ((all-xys (find-walkables level))
+	 (dark-xys (copy-list all-xys))
+	 (lights nil)
+	 (obstacle-map (level-acquire-obstacle-map level))
+	 (factor *universal-light-half-life*)
+	 (threshold (/ 1 255))
+	 (acceptable-dark (truncate (* (- 1 target) (length dark-xys)))))
+    (do ((intensity (funcall intensity-gen) (funcall intensity-gen)))
+	((<= (length dark-xys) acceptable-dark)  lights)
+      (let ((best-x nil)
+	    (best-y nil)
+	    (best-new-lit-no 0)
+	    (best-new-lit nil))
+	(debug-print 50 "Beginning light coverage round.~%")
+	(dolist (xy (if (not estimate)
+			all-xys
+			(select-n-random 200 dark-xys)))
+	  (let* ((x (car xy))
+		 (y (cdr xy))
+		 (fov (extract-fov-xys
+		       (progn
+			 (tcod:map-compute-fov obstacle-map
+					       x
+					       y
+					       (max (level-width level) (level-height level))
+					       t
+					       :fov-shadow)
+			 obstacle-map)))
+		 (potential-lit (intersection dark-xys fov :test #'equal))
+		 (actual-lit
+		  (remove-if-not
+		   #'(lambda (xy)
+			     (let ((extra-light
+				    (* intensity (exp (* factor (distance x y (car xy) (cdr xy)))))))
+			       (>= (+ (tile-lighting (tile-at level (car xy) (cdr xy)))
+				      extra-light)
+				   threshold)))
+		   potential-lit))
+		 (actual-lit-no (length actual-lit)))
+	    (unless (<= actual-lit-no best-new-lit-no)
+	      (setf best-new-lit-no actual-lit-no
+		    best-new-lit actual-lit
+		    best-x x
+		    best-y y))))
+	(debug-print 50 "Light coverage round over: winner ~a ~a, ~a new lit tiles.~%" best-x best-y best-new-lit-no)
+	(setf dark-xys (set-difference dark-xys best-new-lit :test #'equal))
+	(push (make-light-source :x best-x
+				 :y best-y
+				 :intensity intensity)
+	      lights)
+	(add-light-from-source (car lights) obstacle-map)))
+    (level-release-obstacle-map level obstacle-map)
+    (clear-lighting level)
+    lights))
 
 (defun try-player-pick-up (item)
   (unless (null (creature-pick-up *game-player* item))
@@ -353,7 +448,7 @@
 (defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
-    (setf *game-current-level* (create-level-test map-width map-height))
+    (setf *game-current-level* (create-level-generated map-width map-height))
     (setf *game-player* (spawn-creature 
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
@@ -364,14 +459,14 @@
 			  :max-hp 20)
 			 *game-current-level*))
     (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
+    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.9) 1 t)))
+      (dolist (ls light-sources)
+	(push ls *game-braziers*))
+      (debug-print 50 "Generated light sources: ~a.~%" light-sources))
     (setf *game-torch* (make-light-source
 			:x (player-x)
 			:y (player-y)
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
-    (setf *game-brazier* (make-light-source
-			  :x 2
-			  :y 8
-			  :intensity 0.9))
     (spawn-creature (make-creature
 		     :appearance (make-appearance :glyph (char-code #\~)
 						  :foreground-colour '(0 0 0))
