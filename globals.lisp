@@ -63,6 +63,12 @@
 	(incf (cdar *game-text-buffer*))
 	(push (cons string 1) *game-text-buffer*))))
 
+(defun buffer-show-cap (&rest rest)
+  (let ((string (capitalize (apply #'format (cons nil rest)))))
+    (if (equal (caar *game-text-buffer*) string)
+	(incf (cdar *game-text-buffer*))
+	(push (cons string 1) *game-text-buffer*))))
+
 (defparameter *buffer-clear-time* nil)
 
 (defun buffer-clear ()
@@ -78,6 +84,25 @@
   (debug-print 40 "Popping hooks.")
   (pop *game-input-hooks-stack*)
   (debug-print 45 "Hook layers: ~a.~%" (length *game-input-hooks-stack*)))
+
+
+
+
+(defun query-letterset (question letterset f-result)
+  (debug-print 10 "Asking to confirm query: ~a~%" question)
+  (buffer-clear)
+  (buffer-show "~a" question)
+  (push-hooks #'(lambda (value stack)
+		  (declare (ignore stack))
+		  (cond
+		    ((find value letterset)
+		     (buffer-clear)
+		     (pop-hooks)
+		     (funcall f-result value))
+		    (t
+		     (buffer-clear)
+		     (buffer-show "~a" question))))))
+
 
 (defun query-confirm (question f-yes &optional (f-no nil))
   (debug-print 10 "Asking to confirm query: ~a~%" question)

@@ -21,20 +21,8 @@
 (defun close-libraries ()
   (cffi:close-foreign-library 'libtcod))
 
-(defun set-tcod-opacity-map (map fov-map)
-  (let ((width (car (array-dimensions map)))
-	(height (cadr (array-dimensions map))))
-    (dotimes (x width)
-      (dotimes (y height)
-	(tcod:map-set-properties fov-map
-				 x
-				 y
-				 (not (tile-opaque (aref map x y)))
-				 nil)))))
-
 (defun game-loop ()
   (do* ((*game-running* t)
-	(fov-map nil)
 	(terrain-updated t)
 	(fov-updated t)
 	(player-last-xy nil)
@@ -48,36 +36,31 @@
       (let ((map-width (level-width *game-current-level*))
 	    (map-height (level-height *game-current-level*))
 	    (tiles (level-tiles *game-current-level*)))
-	(setf fov-map (or fov-map
-			  (tcod:map-new map-width map-height)))
 	(unless (eq (creature-xy *game-player*) player-last-xy)
 	  (setf fov-updated t)
 	  (setf player-last-xy (creature-xy *game-player*)))
-	(unless (not terrain-updated)
-	  (debug-print 50 "Updating opacity map.~%")
-	  (set-tcod-opacity-map tiles fov-map)
-	  (setf terrain-updated nil))
 	(unless (not fov-updated)
-	  (debug-print 50 "Updating FOV and lighting.~%")
-	  (clear-lighting)
-	  (add-light-from-source *game-torch* fov-map)
-	  (add-light-from-source *game-brazier* fov-map)
-	  (tcod:map-compute-fov fov-map
-				(car (creature-xy *game-player*))
-				(cdr (creature-xy *game-player*))
-				(+ map-width map-height)
-				t
-				:fov-shadow)
-	  (dotimes (x map-width)
-	    (dotimes (y map-height)
-	      (let ((tile (tile-at *game-current-level* x y)))
-		(debug-print 2000 "Lighting at ~a ~a is ~a.~%" x y (tile-lighting tile))
-		(setf (tile-visible (aref tiles x y))
-		      (and 
-		       (not (tile-dark tile))
-		       (tcod:map-is-in-fov? fov-map x y))))))
-	  (setf fov-updated nil))
-	
+	  (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
+	    (debug-print 50 "Updating FOV and lighting.~%")
+	    (clear-lighting)
+	    (add-light-from-source *game-torch* fov-map)
+	    (add-light-from-source *game-brazier* fov-map)
+	    (tcod:map-compute-fov fov-map
+				  (car (creature-xy *game-player*))
+				  (cdr (creature-xy *game-player*))
+				  (+ map-width map-height)
+				  t
+				  :fov-shadow)
+	    (dotimes (x map-width)
+	      (dotimes (y map-height)
+		(let ((tile (tile-at *game-current-level* x y)))
+		  (debug-print 2000 "Lighting at ~a ~a is ~a.~%" x y (tile-lighting tile))
+		  (setf (tile-visible (aref tiles x y))
+			(and 
+			 (not (tile-dark tile))
+			 (tcod:map-is-in-fov? fov-map x y))))))
+	    (setf fov-updated nil)
+	    (level-release-obstacle-map *game-current-level* fov-map)))
 	(dotimes (x map-width)
 	  (dotimes (y map-height)
 	    (let* ((tile (aref tiles x y))
@@ -171,7 +154,7 @@
   (if (null *game-player*)
       ""
       (format nil "~a [~a/~a]"
-	      (creature-name *game-player*)
+	      (indefinite-noun (creature-name *game-player*))
 	      (creature-hp *game-player*)
 	      (creature-max-hp *game-player*))))
 

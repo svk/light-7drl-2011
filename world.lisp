@@ -1,46 +1,37 @@
 (in-package #:light-7drl)
 
-(defstruct appearance
-  glyph
-  (foreground-colour '(255 255 255))
-  (background-colour nil))
+(defun level-set-obstacle-map (level omap)
+  (with-slots (obstacle-map)
+      level
+    (setf obstacle-map omap)))
 
-(defstruct tile
-  appearance
-  opaque
-  walkable
-  (visible nil)
-  (creature nil)
-  (items nil)
-  (lighting 0))
+(defmethod print-object ((level level) stream)
+    (format stream "[Level]"))
 
-(defstruct creature
-  appearance
-  name
-  hp
-  max-hp
-  (ai nil)
-  (tile nil)
-  (xy nil)
-  (items nil)
-  (level nil))
+(defun set-tcod-opacity-map (map fov-map)
+  (let ((width (car (array-dimensions map)))
+	(height (cadr (array-dimensions map))))
+    (dotimes (x width)
+      (dotimes (y height)
+	(tcod:map-set-properties fov-map
+				 x
+				 y
+				 (not (tile-opaque (aref map x y)))
+				 nil)))))
 
-(defstruct item
-  appearance
-  name
-  size)
+(defun level-acquire-obstacle-map (level)
+  (with-slots (obstacle-map obstacle-map-updated tiles)
+      level
+    (let ((rv obstacle-map))
+      (unless (or (null obstacle-map)
+		  obstacle-map-updated)
+	(set-tcod-opacity-map tiles obstacle-map))
+      (setf obstacle-map nil)
+      rv)))
 
-(defstruct level
-  width
-  height
-  tiles
-  (creatures nil))
-
-(defstruct light-source
-  x
-  y
-  intensity
-  (cached-fov nil))
+(defun level-release-obstacle-map (level omap)
+  (unless (null omap)
+    (level-set-obstacle-map level omap)))
 
 (defun apply-to-all-tiles (map f)
   (dotimes (x (level-width map))
@@ -134,16 +125,8 @@
 	 (tile (tile-at level xp yp))
 	 (map (level-tiles level)))
     (unless (not (creature-can-walk? creature tile))
-      (set-creature-position creature level xp yp)
+      (set-position creature xp yp level)
       tile)))
-
-(defun set-creature-position (creature level x y)
-  (unless (null (creature-tile creature))
-    (setf (tile-creature (creature-tile creature)) nil))
-  (setf (tile-creature (tile-at level x y)) creature
-	(creature-level creature) level
-	(creature-xy creature) (cons x y)
-	(creature-tile creature) (tile-at level x y)))
 
 (defun spawn-creature (creature level)
   (let* ((xy (select-random 
@@ -152,8 +135,7 @@
 	 (x (car xy))
 	 (y (cdr xy)))
     (debug-print 50 "Spawning creature ~a on ~a.~%" creature xy)
-    (set-creature-position creature level x y)
-    (push creature (level-creatures level))
+    (set-position creature x y level)
     creature))
 
 (defun tick-creatures (list)
@@ -203,7 +185,9 @@
 	      :height height
 	      :tiles (make-array (list width height)
 				 :initial-element (make-floor-tile))
-	      :creatures nil)))
+	      :creatures nil
+	      :obstacle-map (tcod:map-new width height)
+	      :obstacle-map-updated nil)))
     (dotimes (x width)
       (dotimes (y height)
 	(setf (aref (level-tiles rv) x y)
@@ -320,7 +304,12 @@
       ((or (null target) (not (tile-walkable target)))
        (buffer-show "The way is blocked."))
       ((not (null (tile-creature target)))
-       (buffer-show "There's something in the way, and ~a is a pacifist." (creature-name *game-player*)))
+       (let* ((creature (tile-creature target))
+	      (c-name (creature-name creature)))
+	 (buffer-show "There's ~a in the way, and ~a doesn't want to hurt ~a."
+		      (indefinite-noun c-name)
+		      (definite-noun (creature-name *game-player*))
+		      (third-person-singular (creature-gender creature)))))
       (t 
        (let ((old-tile (creature-tile *game-player*))
 	     (new-tile (try-move-creature *game-player* dx dy)))
@@ -349,11 +338,19 @@
   
 (defun initialize-first-game ()
   (query-string
-   "Enter your name:"
+   "Enter your name: "
    #'(lambda (player-name)
-       (initialize-first-game-with-info player-name))))
+       (query-letterset
+	"Are you [m]ale or [f]emale? "
+	'(#\m #\f)
+	(lambda (player-genderletter)
+	  (initialize-first-game-with-info player-name
+					   (case player-genderletter
+					     (#\m :male)
+					     (#\f :female)
+					     (t nil))))))))
 
-(defun initialize-first-game-with-info (player-name)
+(defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
     (setf *game-current-level* (create-level-test map-width map-height))
@@ -361,10 +358,12 @@
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
 						       :foreground-colour '(0 0 255))
-			  :name player-name
+			  :name (make-proper-noun player-name)
+			  :gender player-gender
 			  :hp 20
 			  :max-hp 20)
 			 *game-current-level*))
+    (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
     (setf *game-torch* (make-light-source
 			:x (player-x)
 			:y (player-y)
@@ -376,7 +375,7 @@
     (spawn-creature (make-creature
 		     :appearance (make-appearance :glyph (char-code #\~)
 						  :foreground-colour '(0 0 0))
-		     :name "Monster"
+		     :name n-monster
 		     :hp 10
 		     :max-hp 10
 		     :ai #'ai-random-walk)
@@ -388,9 +387,15 @@
 			      :size 1))
     (debug-print 50 "Printing welcome messages.~%")
     (buffer-show "Welcome to Light7DRL!")
-    (buffer-show "How pitiful his tale!")
-    (buffer-show "How rare his beauty!")
+    (buffer-show "How pitiful ~a tale!" (player-possessive))
+    (buffer-show "How rare ~a beauty!" (player-possessive))
     (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)))
+
+(defun player-possessive ()
+  (third-person-possessive (creature-gender *game-player*)))
+
+(defun player-singular ()
+  (third-person-singular (creature-gender *game-player*)))
 
 (defun cheat-spawn-thingy ()
   (creature-give *game-player*

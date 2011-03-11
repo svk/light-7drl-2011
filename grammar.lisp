@@ -1,29 +1,109 @@
 (in-package :light-7drl)
 
-(defstruct noun
-  indefinite-article
-  use-definite-article
-  singular
-  plural)
+(defclass noun ()
+  ((indefinite-article :reader noun-indefinite-article
+		       :initarg :indefinite-article)
+   (use-definite-article :reader noun-use-definite-article
+			 :initarg :use-definite-article)
+   (singular :reader noun-singular
+	     :initarg :singular)
+   (plural :reader noun-plural
+	   :initform nil
+	   :initarg :plural)
+   (person :reader noun-person
+	   :initform :third
+	   :initarg :person)))
+  
+(defun grammatical-number (count)
+  (case count
+    (1 :singular)
+    (t :plural)))
 
-(defmacro defnoun (name indefinite-article singular plural &optional (use-definite-article t))
-    `(defparameter ,name (make-noun :indefinite-article ,indefinite-article
-			      :use-definite-article ,use-definite-article
-			      :singular ,singular
-			      :plural ,plural)))
+(defclass verb ()
+  ((conjugation-table :initform (make-hash-table :test #'equal))))
 
-(defmacro defnoun-uncountable (name singular &optional (use-definite-article t))
-    `(defparameter ,name (make-noun :indefinite-article nil
-			      :use-definite-article ,use-definite-article
-			      :singular ,singular
-			      :plural nil)))
+(defmethod declare-conjugation ((verb verb) person number tense word)
+  (with-slots (conjugation-table)
+      verb
+    (setf (gethash (list person number tense) conjugation-table) word)))
 
+(defmethod lookup-conjugation ((verb verb) person number tense)
+  (with-slots (conjugation-table)
+      verb
+    (gethash (list person number tense) conjugation-table "[VERB-ERROR]")))
+
+(defmethod dnoun-verbs ((noun noun) (verb verb))
+  (format nil
+	  "~a ~a"
+	  (definite-noun noun)
+	  (lookup-conjugation verb (noun-person noun) :singular :present)))
+
+(defmethod inoun-verbs ((noun noun) (verb verb))
+  (format nil
+	  "~a ~a"
+	  (indefinite-noun noun)
+	  (lookup-conjugation verb (noun-person noun) :singular :present)))
+
+(defmethod pnoun-verb ((noun noun) (verb verb))
+  (format nil
+	  "~a ~a"
+	  (noun-plural noun)
+	  (lookup-conjugation verb (noun-person noun) :plural :present)))
+
+(defmethod icnoun-verb (count (noun noun) (verb verb))
+  (format nil
+	  "~a ~a"
+	  (indefinite-counted-noun noun count)
+	  (lookup-conjugation verb (noun-person noun) (grammatical-number count) :present)))
+  
+
+(defmacro defnoun (name indefinite-article singular plural &optional (use-definite-article t) (person :third))
+    `(defparameter ,name (make-instance 'noun :indefinite-article ,indefinite-article
+					:use-definite-article ,use-definite-article
+					:singular ,singular
+					:plural ,plural
+					:person ,person)))
+
+(defmacro defnoun-uncountable (name singular &optional (use-definite-article t) (person :third))
+    `(defparameter ,name (make-instance 'noun :indefinite-article nil
+					:use-definite-article ,use-definite-article
+					:singular ,singular
+					:plural nil
+					:person ,person)))
+
+(defun make-proper-noun (name)
+  (make-instance 'noun :indefinite-article nil
+		 :use-definite-article nil
+		 :singular name
+		 :plural nil))
+
+(defnoun-uncountable n-you "you" :person :second)
 
 (defnoun n-sword "a" "sword" "swords")
 (defnoun n-child "a" "child" "children")
 (defnoun n-goose "a" "goose" "geese")
 (defnoun n-arrow "an" "arrow" "arrows")
+(defnoun n-monster "a" "monster" "monsters")
 (defnoun-uncountable n-tea "tea")
+
+(defmacro defverb-23p (name present-second present-third)
+  (let ((sym (gensym)))
+    `(defparameter ,name
+       (progn (let ((,sym (make-instance 'verb)))
+		(declare-conjugation ,sym :second :singular :present ,present-second)
+		(declare-conjugation ,sym :third :singular :present ,present-third)
+		,sym)))))
+
+;; All in moderation for verbs: (present) you -, he/she/it -
+(defverb-23p v-kill "kill" "kills")
+(defverb-23p v-strike "strike" "strikes")
+(defverb-23p v-die "die" "dies")
+(defverb-23p v-miss "miss" "misses")
+(defverb-23p v-is "are" "is")
+(defverb-23p v-hit "hit" "hits")
+(defverb-23p v-lie "lie" "lies")
+(defverb-23p v-attack "attack" "attacks")
+
 
 (defun noun-definite-article (noun)
   (if (noun-use-definite-article noun)
@@ -89,6 +169,18 @@
 	(incf (cdr entry))
 	(push (cons thing 1) rv))))
 
+(defun third-person-singular (gender)
+  (case gender
+    (:female "she")
+    (:male "he")
+    (t "it")))
+
+(defun third-person-possessive (gender)
+  (case gender
+    (:female "her")
+    (:male "his")
+    (t "its")))
+
 (defmethod print-object ((object noun) stream)
   (format stream "[~a]" (noun-singular object)))
 
@@ -102,6 +194,9 @@
 	(1)
 	(2 (format out " and "))
 	(t (format out ", "))))))
+
+(defun capitalize (string)
+  (format nil "~a~a" (char-upcase (aref string 0)) (subseq string 1)))
 
 
     
