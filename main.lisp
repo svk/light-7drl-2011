@@ -68,7 +68,7 @@
 	    (debug-print 2000 "Lighting at ~a ~a is ~a.~%" x y (tile-lighting tile))
 	    (setf (tile-visible (aref *game-map* x y))
 		  (and 
-		   (>= (tile-lighting tile) +light-visibility-threshold+)
+		   (not (tile-dark tile))
 		   (tcod:map-is-in-fov? fov-map x y))))))
       (setf fov-updated nil))
     
@@ -134,6 +134,12 @@
 			   :set
 			   :left
 			   (make-statusline))
+    (tcod:console-print-ex tcod:*root*
+			   0
+			   (+ 1 (- +screen-height+ +ui-bottom-lines+))
+			   :set
+			   :left
+			   (make-statusline-2))
     (setf *game-text-buffer* nil)
     
     (tcod:console-flush)
@@ -147,43 +153,54 @@
 	  (creature-name *game-player*)
 	  (creature-hp *game-player*)
 	  (creature-max-hp *game-player*)))
+
+(defun make-statusline-2 ()
+  (let ((statuses nil))
+    (unless (not (tile-dark (creature-tile *game-player*)))
+      (push "Darkness " statuses))
+    (apply #'concatenate (cons 'string statuses))))
+    
 	  
 
 (defun quit-game ()
     (setf *game-running* nil))
 
-(defun handle-input (thing)
-  (let ((result (assoc thing *game-input-hooks* :test #'equal)))
-    (if result
-	(funcall (cdr result))
-	(debug-print 100 "Unhooked input: ~a.~%" thing))))
+(defun handle-input (thing stack)
+  (debug-print 40 "Handling input ~a with hook stack: ~a~%" thing stack)
+  (if (null stack)
+      (debug-print 100 "Unhooked input: ~a.~%" thing)
+      (funcall (car stack) thing (cdr stack))))
 
 (defun handle-keyboard-input (key)
   (debug-print 200 "Handling input: ~a.~%" key)
   (let ((vk (tcod:key-vk key)))
     (cond
-      ((eq vk :CHAR) (handle-input (tcod:key-c key)))
-      (t (handle-input (tcod:key-vk key))))))
-
-(defun add-input-hook (thing hook)
-  (push (cons thing hook) *game-input-hooks*))
+      ((eq vk :CHAR) (handle-input (tcod:key-c key) *game-input-hooks-stack*))
+      (t (handle-input (tcod:key-vk key) *game-input-hooks-stack*)))))
 
 (defun move-command (dx dy)
   ;; Later, we might not be moving the player, but, say, a cursor.
   (try-move-player dx dy))
 
-(defun reset-standard-input-hooks ()
-  (setf *game-input-hooks* nil)
-  (add-input-hook #\h #'(lambda () (move-command -1 0)))
-  (add-input-hook #\l #'(lambda () (move-command 1 0)))
-  (add-input-hook #\j #'(lambda () (move-command 0 1)))
-  (add-input-hook #\k #'(lambda () (move-command 0 -1)))
-  (add-input-hook #\y #'(lambda () (move-command -1 -1)))
-  (add-input-hook #\u #'(lambda () (move-command 1 -1)))
-  (add-input-hook #\b #'(lambda () (move-command -1 1)))
-  (add-input-hook #\n #'(lambda () (move-command 1 1)))
-  (add-input-hook #\V #'(lambda () (setf *cheat-lightall* (not *cheat-lightall*))))
-  (add-input-hook #\Q #'quit-game))
+(defmacro toggle (variable)
+  `(setf ,variable (not ,variable)))
+
+(defun make-standard-input-hooks ()
+  #'(lambda (value stack)
+	    (case value
+	      (#\h (move-command -1 0))
+	      (#\j (move-command 0 1))
+	      (#\k (move-command 0 -1))
+	      (#\l (move-command 1 0))
+	      (#\y (move-command -1 -1))
+	      (#\u (move-command 1 -1))
+	      (#\b (move-command -1 1))
+	      (#\n (move-command 1 1))
+	      (#\d (try-player-drop-stack))
+	      (#\, (try-player-pick-up-stack))
+	      (#\V (toggle *cheat-lightall*))
+	      (#\Q (query-confirm "Really quit?" #'quit-game))
+	      (t (handle-input value stack)))))
 
 (defun start-game ()
   (let* ((game-title "Light7DRL"))
@@ -201,7 +218,8 @@
 			    nil ;; not a fullscreen game
 			    :renderer-sdl)
     (tcod:console-set-keyboard-repeat 500 10)
-    (reset-standard-input-hooks)
+    (setf *game-input-hooks-stack* nil)
+    (push-hooks (make-standard-input-hooks))
     (debug-print 100 "Entering loop.~%")
     (game-loop)
     (debug-print 100 "End loop.~%")))

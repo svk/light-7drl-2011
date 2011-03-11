@@ -21,7 +21,13 @@
   max-hp
   (ai nil)
   (tile nil)
-  (xy nil))
+  (xy nil)
+  (items nil))
+
+(defstruct item
+  appearance
+  name
+  size)
 
 (defstruct light-source
   x
@@ -176,14 +182,20 @@
 		   :foreground-colour (appearance-foreground-colour above)
 		   :background-colour (appearance-background-colour below)))
 
+(defun tile-dark (tile)
+  (< (tile-lighting tile) +light-visibility-threshold+))
+
 (defun appearance-at (tile)
   (unless (not (tile-creature tile))
     (return-from appearance-at
       (overlay-appearances
        (creature-appearance (tile-creature tile))
        (tile-appearance tile))))
-;;  (unless (not (tile-items tile))
-;;    (return-from appearance-at (item-appearance (car (tile-items tile)))))
+  (unless (not (tile-items tile))
+    (return-from appearance-at
+      (overlay-appearances
+       (item-appearance (car (tile-items tile)))
+       (tile-appearance tile))))
   (tile-appearance tile))
 
 (defun create-game-map (width height)
@@ -246,6 +258,56 @@
 (defun player-x () (car (creature-xy *game-player*)))
 (defun player-y () (cdr (creature-xy *game-player*)))
 
+(defun creature-give (creature item)
+  (debug-print 10 "Giving item \"~a\" to creature \"~a\"" (item-name item) (creature-name creature))
+  (push item (creature-items creature))
+  (debug-print 10 "Inventory is now ~a.~%" (mapcar #'item-name (creature-items creature)))
+  item)
+
+(defun creature-take (creature item)
+  (debug-print 10 "Taking item \"~a\" from creature \"~a\"" (item-name item) (creature-name creature))
+  (setf (creature-items creature) (remove item (creature-items creature)))
+  item)
+
+(defun creature-pick-up (creature item)
+  (let ((tile (creature-tile creature)))
+    (setf (tile-items tile) (remove item (tile-items tile)))
+    (creature-give creature item)))
+
+(defun creature-drop (creature item)
+  (unless (null (creature-take creature item))
+    (push item (tile-items (creature-tile creature)))
+    item))
+
+(defun try-player-pick-up (item)
+  (unless (null (creature-pick-up *game-player* item))
+    (buffer-show "You pick up the ~a." (item-name item))))
+
+(defun try-player-drop (item &optional (confirmed nil))
+  (cond
+    ((and (not confirmed)
+	  (tile-dark (creature-tile *game-player*)))
+     (query-confirm (format nil
+			    "Really drop the ~a in complete darkness? It might be hard to retrieve it."
+			    (item-name item))
+		    #'(lambda () (try-player-drop item t))))
+    (t (unless (null (creature-drop *game-player* item))
+	 (buffer-show "You drop the ~a." (item-name item))))))
+
+(defun try-player-drop-stack ()
+  (if (null (creature-items *game-player*))
+      (buffer-show "You're not holding anything you could drop.")
+      (try-player-drop (car (creature-items *game-player*)))))
+
+(defun try-player-pick-up-stack ()
+  (let ((tile (tile-at *game-map* (player-x) (player-y))))
+    (cond
+      ((not (tile-visible (creature-tile *game-player*)))
+       (buffer-show "It's too dark to make out any items on the floor here."))
+      ((null (tile-items tile))
+       (buffer-show "There's nothing here to pick up."))
+      (t (try-player-pick-up (car (tile-items tile)))))))
+
 (defun try-move-player (dx dy)
   (let ((target (tile-at *game-map* (+ (player-x) dx) (+ (player-y) dy))))
     (cond
@@ -254,9 +316,17 @@
       ((not (null (tile-creature target)))
        (buffer-show "There's something in the way, and ~a is a pacifist." (creature-name *game-player*)))
       (t 
-       (unless (not (try-move-creature *game-map* *game-player* dx dy))
-	 (move-light-source *game-torch* (player-x) (player-y))
-	 (player-took-action))))))
+       (let ((old-tile (creature-tile *game-player*))
+	     (new-tile (try-move-creature *game-map* *game-player* dx dy)))
+	 (unless (not new-tile)
+	   (move-light-source *game-torch* (player-x) (player-y))
+	   (cond ((and (tile-dark old-tile)
+		       (not (tile-dark new-tile)))
+		  (buffer-show "Your eyes blink as you adjust to the light."))
+		 ((and (not (tile-dark old-tile))
+		       (tile-dark new-tile))
+		  (buffer-show "You stumble into the darkness.")))
+	   (player-took-action)))))))
 
 (defun initialize-first-game ()
   (let ((map-width +screen-width+)
@@ -286,6 +356,11 @@
 		     :max-hp 10
 		     :ai #'ai-random-walk)
 		    *game-map*)
+    (creature-give *game-player*
+		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
+							   :foreground-colour '(0 0 0))
+			      :name "sword"
+			      :size 1))
     (push "Welcome to Light7DRL!" *game-text-buffer*)
     (buffer-show "How pitiful his tale!")
     (buffer-show "How rare his beauty!")))

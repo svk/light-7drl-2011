@@ -1,14 +1,19 @@
 (in-package light-7drl)
 
-(eval-when (:compile-toplevel)
-  (defparameter *debug-level* 50))
+;; (defmacro debug-print (level &rest rest)
+;;  (if (and (boundp '*debug-level*)
+;;	   (<= level *debug-level*))
+;;      `(format t ,@rest)
+;;      nil))
 
-(defmacro debug-print (level &rest rest)
-  (if (and (boundp '*debug-level*)
-	   (<= level *debug-level*))
-      `(format t ,@rest)
-      nil))
+(defparameter *debug-level* 50)
 
+(defun debug-print (level &rest rest)
+  (unless (not (and (boundp '*debug-level*)
+		    (<= level *debug-level*)))
+    (apply #'format (cons t rest))))
+
+(defconstant +weapon-glyph+ (char-code #\/))
 (defconstant +wall-glyph+ 219)
 (defconstant +player-glyph+ (char-code #\@))
 (defconstant +floor-glyph+ (char-code #\ ))
@@ -19,7 +24,7 @@
 (defparameter *tileset-file* "my-tiles.png")
 
 (defconstant +ui-top-lines+ 3)
-(defconstant +ui-bottom-lines+ 1)
+(defconstant +ui-bottom-lines+ 2)
 
 (defparameter *game-map* nil)
 (defparameter *game-player* nil)
@@ -27,8 +32,6 @@
 (defparameter *game-text-buffer* nil)
 
 (defparameter *game-initialized* nil)
-
-(defparameter *game-input-hooks* nil)
 
 (defparameter *game-torch* nil)
 (defparameter *game-brazier* nil)
@@ -51,7 +54,32 @@
 
 (defparameter *universal-light-half-life* (light-half-life 4))
 
+(defparameter *game-input-hooks-stack* nil)
+
 (defun buffer-show (&rest rest)
   (push (apply #'format (cons nil rest)) *game-text-buffer*))
+
+(defun push-hooks (hooks)
+  (debug-print 40 "Pushing new hooks.~%")
+  (push hooks *game-input-hooks-stack*)
+  (debug-print 45 "Hook layers: ~a.~%" (length *game-input-hooks-stack*)))
+
+(defun pop-hooks ()
+  (debug-print 40 "Popping hooks.")
+  (pop *game-input-hooks-stack*)
+  (debug-print 45 "Hook layers: ~a.~%" (length *game-input-hooks-stack*)))
+
+(defun query-confirm (question f-yes &optional (f-no nil))
+  (debug-print 10 "Asking to confirm query: ~a~%" question)
+  (buffer-show "~a [y/n]" question)
+  (push-hooks #'(lambda (value stack)
+		  (declare (ignore stack))
+		  (case value
+		    (#\y (funcall f-yes)
+			 (pop-hooks))
+		    (#\n (unless (null f-no)
+			   (funcall f-no))
+			 (pop-hooks))
+		    (t (buffer-show "~a [y/n]" question))))))
 
 
