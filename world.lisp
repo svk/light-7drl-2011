@@ -42,6 +42,12 @@
       (debug-print 50 "Released obstacle map..~%")
     (level-set-obstacle-map level omap)))
 
+(defun xy-in-bounds? (xy)
+  (and (>= (car xy) 0)
+       (>= (cdr xy) 0)
+       (< (car xy) (level-width *game-current-level*))
+       (< (cdr xy) (level-height *game-current-level*))))
+
 (defun apply-to-all-tiles (map f)
   (dotimes (x (level-width map))
     (dotimes (y (level-height map))
@@ -450,6 +456,10 @@
 						       :foreground-colour '(0 0 255))
 			  :name (make-proper-noun player-name)
 			  :gender player-gender
+			  :hit-chance (make-chance-roll :success-chance 3/4)
+			  :damage (make-dice-roll :number-of-dice 2
+						  :dice-size 6
+						  :constant 4)
 			  :hp 20
 			  :max-hp 20)
 			 *game-current-level*))
@@ -463,16 +473,20 @@
 			:y (player-y)
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
     (debug-print 50 "what the fuck should spawn creature")
-    (let ((monster (make-creature
-		    :appearance (make-appearance :glyph (char-code #\~)
-						 :foreground-colour '(0 0 0))
-		    :name n-monster
-		    :hp 10
-		    :max-hp 10
-		    :darkvision t
-		    :ai #'ai-fair-search-player-and-destroy)))
-      (debug-print 50 "created unspawned creature: ~a.~%" monster)
-      (spawn-creature monster *game-current-level*))
+    (dotimes (i 10)
+      (let ((monster (make-creature
+		      :appearance (make-appearance :glyph (char-code #\~)
+						   :foreground-colour '(0 0 0))
+		      :name n-monster
+		      :hp 10
+		      :max-hp 10
+		      :hit-chance (make-chance-roll :success-chance 3/4)
+		      :damage (make-dice-roll :number-of-dice 1
+					      :dice-size 0)
+		      :darkvision t
+		      :ai #'ai-search-player-and-destroy)))
+	(debug-print 50 "created unspawned creature: ~a.~%" monster)
+	(spawn-creature monster *game-current-level*)))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+

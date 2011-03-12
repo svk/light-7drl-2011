@@ -221,6 +221,7 @@
 	      (#\u (move-command 1 -1))
 	      (#\b (move-command -1 1))
 	      (#\n (move-command 1 1))
+	      (#\. (player-took-action))
 	      (#\d (try-player-drop-stack))
 	      (#\, (try-player-pick-up-stack))
 	      (#\V (toggle *cheat-lightall*))

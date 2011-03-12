@@ -61,8 +61,14 @@
    (level :accessor creature-level
 	  :initform nil
 	  :initarg :level)
+   (stepmap-to :initform nil)
    (fov :accessor creature-fov
 	:initform nil)
    (darkvision :accessor creature-darkvision
 	       :initform nil
-	       :initarg :darkvision)))
+	       :initarg :darkvision)
+   (base-hit-chance :initarg :hit-chance)
+   (base-damage :initarg :damage)
+   (attack-verb :initarg :attack-verb)
+   (hit-verb :initarg :hit-verb)
+   (miss-verb :initarg :miss-verb)))

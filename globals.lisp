@@ -68,6 +68,9 @@
 (defun neighbours-of (x y)
   (mapcar #'(lambda (xy) (cons (+ x (car xy)) (+ y (cdr xy)))) *directions*))
 
+(defun neighbours-of-xy (xy)
+  (neighbours-of (car xy) (cdr xy)))
+
 (defun cardinal-neighbours-of (x y)
   (mapcar #'(lambda (xy) (cons (+ x (car xy)) (+ y (cdr xy)))) *cardinal-directions*))
 
@@ -198,3 +201,14 @@
 
 (defun select-random (list)
   (nth (random (length list)) list))
+
+(defconstant +map-width+ +screen-width+)
+(defconstant +map-height+ (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+))
+
+(defun all-xys ()
+  (let ((rv nil))
+    (dotimes (x +map-width+)
+      (dotimes (y +map-height+)
+	(push (cons x y) rv)))
+    rv))
+

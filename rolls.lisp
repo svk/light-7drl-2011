@@ -28,7 +28,10 @@
 (defun roll-result? (dice-roll)
   (with-slots (number-of-dice dice-size constant)
       dice-roll
-    (let ((rv constant))
-      (dotimes (i number-of-dice)
-	(incf rv (+ 1 (random dice-size))))
-      rv)))
+    (max 0
+	 (if (<= dice-size 0)
+	     constant
+	     (let ((rv constant))
+	       (dotimes (i number-of-dice)
+		 (incf rv (+ 1 (random dice-size))))
+	       rv)))))

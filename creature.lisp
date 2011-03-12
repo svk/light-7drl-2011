@@ -1,6 +1,6 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender (hp nil) (darkvision nil))
+(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
@@ -8,7 +8,12 @@
 		 :max-hp max-hp
 		 :gender gender
 		 :darkvision darkvision
-		 :ai ai))
+		 :ai ai
+		 :damage damage
+		 :hit-chance hit-chance
+		 :attack-verb attack-verb
+		 :miss-verb miss-verb
+		 :hit-verb hit-verb))
 
 (defmethod set-position ((creature creature) x y level)
   (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (creature-level creature) x y level)
@@ -21,6 +26,9 @@
   (unless (null (creature-tile creature))
     (setf (tile-creature (creature-tile creature)) nil))
   (invalidate-fov creature)
+  (with-slots (stepmap-to)
+      creature
+    (setf stepmap-to nil))
   (setf (tile-creature (tile-at level x y)) creature
 	(creature-level creature) level
 	(creature-xy creature) (cons x y)
@@ -78,30 +86,31 @@
 	   (is-in-fov? target (get-fov observer)))))
   
 (defmethod melee-attack ((target creature) (attacker creature))
-  (let ((hit-chance (make-chance-roll :success-chance 3/4))
-	(dice-roll (make-dice-roll :number-of-dice 2
-				   :dice-size 4))
-	(player-visible (or (visible-to? target *game-player*)
-			    (visible-to? attacker *game-player*)))
-	(t-noun (creature-name target))
-	(a-noun (creature-name attacker)))
-    (setf player-visible t)
-    (unless (not player-visible)
-      (buffer-show-cap "~a ~a! (~a ~a)"
-		       (dnoun-verbs a-noun v-attack)
-		       (definite-noun t-noun)
-		       hit-chance
-		       dice-roll))
-    (cond ((not (roll-success? hit-chance))
-	   (buffer-show-cap "~a." (dnoun-verbs (third-person attacker)
-					       v-miss)))
-	  (t
-	   (let ((damage (roll-result? dice-roll)))
-	     (buffer-show-cap "~a ~a for ~a damage!"
-			      (dnoun-verbs (third-person attacker) v-strike)
-			      (definite-noun t-noun)
-			      damage)
-	     (damage target damage))))))
+  (with-slots (base-hit-chance base-damage attack-verb hit-verb miss-verb)
+      attacker
+    (let ((hit-chance base-hit-chance)
+	  (dice-roll base-damage)
+	  (player-visible (or (visible-to? target *game-player*)
+			      (visible-to? attacker *game-player*)))
+	  (t-noun (creature-name target))
+	  (a-noun (creature-name attacker)))
+      (setf player-visible t)
+      (unless (not player-visible)
+	(buffer-show-cap "~a ~a! (~a ~a)"
+			 (dnoun-verbs a-noun attack-verb)
+			 (definite-noun t-noun)
+			 hit-chance
+			 dice-roll))
+      (cond ((not (roll-success? hit-chance))
+	     (buffer-show-cap "~a." (dnoun-verbs (third-person attacker)
+						 miss-verb)))
+	    (t
+	     (let ((damage (roll-result? dice-roll)))
+	       (buffer-show-cap "~a ~a for ~a damage!"
+				(dnoun-verbs (third-person attacker) hit-verb)
+				(definite-noun t-noun)
+				damage)
+	       (damage target damage)))))))
 
 (defmethod third-person ((creature creature))
   (with-slots (gender)

@@ -22,6 +22,122 @@
 	 (dy (- (cdr x1y1) (cdr x0y0))))
     (cons (sign dx) (sign dy))))
 
+(defun select-random-or-direct-to (target creature)
+  (let ((step (naive-step-to target creature)))
+    #'(lambda (steps)
+	(debug-print 50 "would prefer ~a, choices ~a~%" step steps)
+	(if (find step steps :test #'equal)
+	    step
+	    (select-random steps)))))
+
+(defun seminaive-step-to (target creature stepmap selector)
+  (or (follow-stepmap creature stepmap selector)
+      (naive-step-to target creature)))
+
+(defun stepmap-lookup (stepmap xy)
+  (if (array-in-bounds-p stepmap (car xy) (cdr xy))
+      (aref stepmap (car xy) (cdr xy))
+      nil))
+
+(defun follow-stepmap (me stepmap selector)
+  (let ((best-steps nil)
+	(best-value (stepmap-lookup stepmap (creature-xy me))))
+    (dolist (neighbour-xy (neighbours-of-xy (creature-xy me)))
+      (let ((val (stepmap-lookup stepmap neighbour-xy)))
+	(if (or (null best-value)
+		(and val
+		     (<= val best-value)))
+	    (progn
+	      (if (or (null best-value)
+		      (< val best-value))
+		  (setf best-steps nil))
+	      (push neighbour-xy best-steps)
+	      (setf best-value val)))))
+    (unless (null best-value)
+      (funcall selector (mapcar #'(lambda (xy) (cons (- (car xy) (creature-x me))
+						     (- (cdr xy) (creature-y me))))
+				best-steps)))))
+
+(defun follow-stepmap-search (me stepmap depth selector)
+  (or (follow-stepmap me stepmap selector)
+      (let* ((level (creature-level me))
+	     (search-map (make-array (array-dimensions (level-tiles level))
+				     :initial-element nil))
+	     (my-x (creature-x me))
+	     (my-y (creature-y me))
+	     (q-tail (cons nil nil))
+	     (q q-tail))
+	(flet ((qadd (r)
+		 (setf (car q-tail) r)
+	     (setf (cdr q-tail) (cons nil nil))
+	     (setf q-tail (cdr q-tail))))
+	  (dolist (neighbour-xy (remove-if-not #'xy-in-bounds? (neighbours-of my-x my-y)))
+	    (setf (aref search-map
+			(car neighbour-xy)
+			(cdr neighbour-xy))
+		  (list (cons (- (car neighbour-xy) my-x)
+			      (- (cdr neighbour-xy) my-y))
+			1))
+	    (qadd neighbour-xy))
+	  (setf (aref search-map my-x my-y) (list (cons 0 0) 0))
+	  (do* ((qe (pop q) (pop q)))
+	       ((null qe) nil)
+	    (unless (>= (cadr (aref search-map (car qe) (cdr qe)))
+		    depth)
+	      (dolist (neighbour-xy (remove-if-not #'xy-in-bounds? (neighbours-of-xy qe)))
+					;	    (debug-print 50 "exploring ~a [~a ~a]~%" neighbour-xy
+					;			 (aref search-map (car neighbour-xy) (cdr neighbour-xy))
+					;			 (not (tile-walkable (tile-at level (car neighbour-xy) (cdr neighbour-xy)))))
+		(unless (or 
+			 (not (null (aref search-map (car neighbour-xy) (cdr neighbour-xy))))
+			 (not (tile-walkable (tile-at level (car neighbour-xy) (cdr neighbour-xy)))))
+;	      (debug-print 50 "acceptable ~a~%" neighbour-xy)
+		  (setf (aref search-map (car neighbour-xy) (cdr neighbour-xy))
+			(list
+			 (car (aref search-map (car qe) (cdr qe)))
+			 (+ 1 (cadr (aref search-map (car qe) (cdr qe))))))
+;		  (debug-print 50 "working at ~a~%" (aref search-map (car neighbour-xy) (cdr neighbour-xy)))
+		  (qadd neighbour-xy)
+		  (if (stepmap-lookup stepmap neighbour-xy)
+		      (progn
+;			(debug-print 50
+;				 "stepmap-search yielded result: ~a first best step to ~a [dist ~a]~%"
+;				 (aref search-map (car qe) (cdr qe))
+;				 neighbour-xy
+;				 (stepmap-lookup stepmap neighbour-xy))
+;			(let ((blah (make-array (array-dimensions search-map))))
+;			  (dotimes (x +map-width+)
+;			    (dotimes (y +map-height+)
+;			      (setf (aref blah x y)
+;				    (if (aref search-map x y)
+;					(cadr (aref search-map x y))
+;					nil))))
+;	;		  (debug-print 50 "~%~a~%" blah))
+			(return-from follow-stepmap-search
+			  (car (aref search-map (car qe) (cdr qe))))))))))))))
+
+(defun sad-search (target creature)
+  (or
+   (follow-stepmap creature
+		   (make-tactical-stepmap-to target creature)
+		   (select-random-or-direct-to target creature))
+   (follow-stepmap-search creature
+			  (get-stepmap-to target)
+			  10
+			  (select-random-or-direct-to target creature))
+   (naive-step-to target creature)
+   (select-random *directions*)))
+
+(defun ai-search-player-and-destroy (creature)
+  (let ((target *game-player*))
+    (cond ((adjacent-to? target creature)
+	   (debug-print 50 "SPD ai: player adjacent~%")
+	   (melee-attack target creature))
+	  (t
+	   (debug-print 50 "SPD ai: seeking path to player~%")
+	   (make-step-or-random creature
+				(sad-search target creature))))))
+  
 (defun ai-fair-search-player-and-destroy (creature)
   (let ((target *game-player*))
     (cond ((not (visible-to? target creature))
@@ -32,5 +148,44 @@
 	   (melee-attack target creature))
 	  (t
 	   (debug-print 50 "FSPD ai: seeking path to player~%")
-	   (make-step-or-random creature (naive-step-to target creature))))))
-	  
+	   (make-step-or-random creature
+				(sad-search target creature))))))
+
+
+(defun stabilize-stepmap (array level &optional (limit nil) (is-not-obstacle? #'tile-walkable))
+  (let ((queued (remove-if-not #'(lambda (xy) (let ((value (aref array (car xy) (cdr xy))))
+						(not (null value))))
+			       (all-xys))))
+    (do ()
+	((null queued) array)
+      (let* ((current-xy (pop queued))
+	     (value (+ 1 (aref array (car current-xy) (cdr current-xy)))))
+	(dolist (neighbour-xy (remove-if-not #'xy-in-bounds? (neighbours-of-xy current-xy)))
+	  (unless (and (not (null limit))
+		       (>= value limit))
+	    (unless (not (funcall is-not-obstacle? (tile-at level (car neighbour-xy) (cdr neighbour-xy))))
+	      (unless (and (not (null (aref array (car neighbour-xy) (cdr neighbour-xy))))
+			   (<= (aref array (car neighbour-xy) (cdr neighbour-xy))
+			       value))
+		(setf (aref array (car neighbour-xy) (cdr neighbour-xy)) value)
+		(push neighbour-xy queued)))))))))
+  
+(defmethod get-stepmap-to ((creature creature))
+  (with-slots (stepmap-to)
+      creature
+    (setf stepmap-to
+	  (or stepmap-to
+	      (let ((arr (make-array (array-dimensions (level-tiles (creature-level creature)))
+				     :initial-element nil)))
+		(setf (aref arr (creature-x creature) (creature-y creature))
+		      0)
+		(stabilize-stepmap arr (creature-level creature) 10))))))
+
+(defmethod make-tactical-stepmap-to ((creature creature) (mover creature))
+  (with-slots (stepmap-to)
+      creature
+    (let ((arr (make-array (array-dimensions (level-tiles (creature-level creature)))
+			   :initial-element nil)))
+      (setf (aref arr (creature-x creature) (creature-y creature))
+	    0)
+      (stabilize-stepmap arr (creature-level creature) 5 #'(lambda (tile) (creature-can-walk? mover tile))))))
