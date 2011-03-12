@@ -462,15 +462,18 @@
 			:x (player-x)
 			:y (player-y)
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
-    (spawn-creature (make-creature
-		     :appearance (make-appearance :glyph (char-code #\~)
-						  :foreground-colour '(0 0 0))
-		     :name n-monster
-		     :hp 10
-		     :max-hp 10
-		     :darkvision t
-		     :ai #'ai-fair-search-player-and-destroy)
-		    *game-current-level*)
+    (debug-print 50 "what the fuck should spawn creature")
+    (let ((monster (make-creature
+		    :appearance (make-appearance :glyph (char-code #\~)
+						 :foreground-colour '(0 0 0))
+		    :name n-monster
+		    :hp 10
+		    :max-hp 10
+		    :darkvision t
+		    :ai #'ai-fair-search-player-and-destroy)))
+      (debug-print 50 "created unspawned creature: ~a.~%" monster)
+      (spawn-creature monster *game-current-level*))
+    (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
 							   :foreground-colour '(0 0 0))

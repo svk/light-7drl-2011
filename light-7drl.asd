@@ -18,4 +18,4 @@
 		 (:file "world"
 			:depends-on ("ai" "rolls" "world-structs" "grammar" "creature" "package" "globals"))
 		 (:file "main"
-			:depends-on ("world-structs" "grammar" "creature" "package" "globals" "world"))))
+			:depends-on ("ai" "world-structs" "grammar" "creature" "package" "globals" "world"))))

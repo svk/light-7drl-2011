@@ -105,19 +105,34 @@
 					   (tcod:compose-colour 0 0 0))
       (tcod:console-set-default-foreground tcod:*root*
 					   (tcod:compose-colour 0 255 255))
-      (dolist (entry-with-count (reverse *game-text-buffer*))
-	(let ((entry (if (<= (cdr entry-with-count) 1)
-			 (car entry-with-count)
-			 (format nil "~a [x~a]" (car entry-with-count) (cdr entry-with-count)))))
-	  (unless (>= y-offset +ui-top-lines+)
-	    (incf y-offset (tcod:console-print-rect-ex tcod:*root*
-						       0
-						       y-offset
-						       +screen-width+
-						       (- +ui-top-lines+ y-offset)
-						       :set
-						       :left
-						       entry))))))
+      (block buffer-print-loop
+	(do* ((entries (reverse *game-text-buffer*) (cdr entries))
+	      (entry-with-count (car entries) (car entries)))
+	     ((null entries))
+	  (let ((entry (if (<= (cdr entry-with-count) 1)
+			   (car entry-with-count)
+			   (format nil "~a [x~a]" (car entry-with-count) (cdr entry-with-count)))))
+	    (if (< y-offset +ui-top-lines+)
+		(incf y-offset (tcod:console-print-rect-ex tcod:*root*
+							   0
+							   y-offset
+							   +screen-width+
+							   (- +ui-top-lines+ y-offset)
+							   :set
+							   :left
+							   entry))
+		(return-from buffer-print-loop
+		  (progn
+		    (tcod:console-print-rect-ex tcod:*root*
+						0
+						y-offset
+						+screen-width+
+						1
+						:set
+						:left
+						"[More]")
+		    (query-space-or-enter #'(lambda ()
+					      (setf *game-text-buffer* (reverse entries)))))))))))
     (unless (not *buffer-clear-time*)
       (debug-print 50 "Buffer wrap up time~%")
       (buffer-clear))
@@ -144,8 +159,10 @@
 
     (debug-print 100 "Before input, game-text-buffer is: ~a.~%" *game-text-buffer*)
 
-    (ignore-errors ;; pressing international chars causes cl-tcod to break
-      (let* ((key (tcod:console-wait-for-keypress t)))
+    (let* ((key nil))
+      (ignore-errors  ;; pressing international chars causes cl-tcod to break
+	(setf key (tcod:console-wait-for-keypress t)))
+      (unless (null key)
 	(handle-keyboard-input key)))
 
     (debug-print 100 "Game-text-buffer is now: ~a.~%" *game-text-buffer*))

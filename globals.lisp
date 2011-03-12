@@ -23,7 +23,7 @@
 
 (defparameter *tileset-file* "my-tiles.png")
 
-(defconstant +ui-top-lines+ 3)
+(defconstant +ui-top-lines+ 5)
 (defconstant +ui-bottom-lines+ 2)
 
 (defparameter *game-current-level* nil)
@@ -122,6 +122,19 @@
 		     (buffer-clear)
 		     (buffer-show "~a" question))))))
 
+(let ((querying-for-more nil))
+  (defun query-space-or-enter (f)
+    (unless querying-for-more
+      (setf querying-for-more t)
+      (push-hooks #'(lambda (value stack)
+		      (declare (ignore stack))
+		      (debug-print 50 "In More, getting ~a.~%" value)
+		      (if (or (eq :space value)
+			      (eq :enter value))
+			  (progn (pop-hooks)
+				 (setf querying-for-more nil)
+				 (funcall f))))))))
+  
 
 (defun query-confirm (question f-yes &optional (f-no nil))
   (debug-print 10 "Asking to confirm query: ~a~%" question)
