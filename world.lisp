@@ -271,8 +271,10 @@
   (tick-creatures (level-creatures *game-current-level*))
   (debug-print 50 "Ticking.~%"))
 
+(defun player-taking-action ()
+  (buffer-clear))
+
 (defun player-took-action ()
-  (setf *buffer-clear-time* t)
   (tick-world))
 
 (defun player-x () (car (creature-xy *game-player*)))
@@ -395,6 +397,7 @@
       (t (try-player-pick-up (car (tile-items tile)))))))
 
 (defun try-move-player (dx dy)
+  (player-taking-action)
   (let ((target (tile-at *game-current-level* (+ (player-x) dx) (+ (player-y) dy))))
     (cond
       ((or (null target) (not (tile-walkable target)))

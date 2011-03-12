@@ -131,6 +131,7 @@
 						:set
 						:left
 						"[More]")
+		    (setf *buffer-clear-time* nil)
 		    (query-space-or-enter #'(lambda ()
 					      (setf *game-text-buffer* (reverse entries)))))))))))
     (unless (not *buffer-clear-time*)
