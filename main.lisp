@@ -226,6 +226,7 @@
 	      (#\d (try-player-drop-stack))
 	      (#\, (try-player-pick-up-stack))
 	      (#\V (toggle *cheat-lightall*))
+	      (#\T (toggle *ai-test-fleeing*))
 	      (#\X (cheat-spawn-thingy))
 	      (#\C (cheat-spawn-doodad))
 	      (#\Q (query-confirm "Really quit?" #'quit-game))

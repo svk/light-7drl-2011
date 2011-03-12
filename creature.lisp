@@ -1,6 +1,6 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit))
+(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
@@ -13,7 +13,15 @@
 		 :hit-chance hit-chance
 		 :attack-verb attack-verb
 		 :miss-verb miss-verb
-		 :hit-verb hit-verb))
+		 :hit-verb hit-verb
+		 :speed speed))
+
+
+(defmethod tick ((creature creature))
+  (with-slots (speed ai)
+      creature
+    (dotimes (i speed)
+      (funcall ai creature))))
 
 (defmethod set-position ((creature creature) x y level)
   (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (creature-level creature) x y level)

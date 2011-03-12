@@ -212,3 +212,5 @@
 	(push (cons x y) rv)))
     rv))
 
+(defparameter *ai-test-fleeing* nil)
+

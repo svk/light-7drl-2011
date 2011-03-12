@@ -128,6 +128,36 @@
    (naive-step-to target creature)
    (select-random *directions*)))
 
+(defun sad-flee (origin creature)
+  (let ((step (sad-search origin creature)))
+    (unless (null step)
+      (cons (- (car step))
+	    (- (cdr step))))))
+
+(defun naive-flee (origin creature)
+  (let ((step (naive-step-to origin creature)))
+    (unless (null step)
+      (cons (- (car step))
+	    (- (cdr step))))))
+
+(defun simple-flee (origin creature)
+  (let* ((ox (creature-x origin))
+	 (oy (creature-y origin))
+	 (best-step (cons 0 0))
+	 (best-value (distance ox oy (creature-x creature) (creature-y creature))))
+    (dolist (dx '(-1 0 1))
+      (dolist (dy '(-1 0 1))
+	(let* ((x (+ dx (creature-x creature)))
+	       (y (+ dy (creature-y creature)))
+	       (dist (distance ox oy x y)))
+	  (if (and (> dist best-value)
+		   (creature-can-walk? creature
+				       (tile-at (creature-level creature) x y)))
+	      (setf best-step (cons dx dy)
+		    best-value dist)))))
+    best-step))
+    
+
 (defun ai-search-player-and-destroy (creature)
   (let ((target *game-player*))
     (cond ((adjacent-to? target creature)
@@ -151,6 +181,12 @@
 	   (make-step-or-random creature
 				(sad-search target creature))))))
 
+(defun ai-test (creature)
+  (cond (*ai-test-fleeing* (make-step-or-random creature
+						  (simple-flee *game-player* creature)))
+	(t (ai-search-player-and-destroy creature))))
+  
+  
 
 (defun stabilize-stepmap (array level &optional (limit nil) (is-not-obstacle? #'tile-walkable))
   (let ((queued (remove-if-not #'(lambda (xy) (let ((value (aref array (car xy) (cdr xy))))

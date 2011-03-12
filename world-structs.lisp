@@ -71,4 +71,7 @@
    (base-damage :initarg :damage)
    (attack-verb :initarg :attack-verb)
    (hit-verb :initarg :hit-verb)
-   (miss-verb :initarg :miss-verb)))
+   (miss-verb :initarg :miss-verb)
+   (speed :initarg :speed
+	  :initform 1)))
+	  

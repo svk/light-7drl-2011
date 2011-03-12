@@ -171,7 +171,7 @@
 (defun tick-creatures (list)
   (dolist (creature list)
     (unless (null (creature-ai creature))
-      (funcall (creature-ai creature) creature))))
+      (tick creature))))
 
 (defun make-wall-tile ()
   (make-tile :appearance (make-appearance :glyph +wall-glyph+
@@ -405,9 +405,7 @@
       ((not (null (tile-creature target)))
        (let* ((creature (tile-creature target))
 	      (c-name (creature-name creature)))
-	 (melee-attack creature *game-player*)
-	 (unless (not (alive? creature))
-	   (melee-attack *game-player* creature))))
+	 (melee-attack creature *game-player*)))
       (t 
        (let ((old-tile (creature-tile *game-player*))
 	     (new-tile (try-move-creature *game-player* dx dy)))
@@ -481,13 +479,14 @@
 		      :appearance (make-appearance :glyph (char-code #\~)
 						   :foreground-colour '(0 0 0))
 		      :name n-monster
+		      :speed 2
 		      :hp 10
 		      :max-hp 10
 		      :hit-chance (make-chance-roll :success-chance 3/4)
 		      :damage (make-dice-roll :number-of-dice 1
 					      :dice-size 0)
 		      :darkvision t
-		      :ai #'ai-search-player-and-destroy)))
+		      :ai #'ai-test)))
 	(debug-print 50 "created unspawned creature: ~a.~%" monster)
 	(spawn-creature monster *game-current-level*)))
     (debug-print 50 "what the fuck should have spawned creature")
