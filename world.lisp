@@ -261,18 +261,6 @@
 (defun find-random-walkable (map)
   (select-random (find-walkables map)))
 
-(defun ai-random-walk (creature)
-  (debug-print 50 "AI random-walk triggers on ~a." (creature-name creature))
-  (let ((moves (remove-if-not #'(lambda (dxdy)
-				  (creature-can-walk? creature 
-						      (tile-at (creature-level creature)
-							       (+ (creature-x creature) (car dxdy))
-							       (+ (creature-y creature) (cdr dxdy)))))
-			      *directions*)))
-    (unless (null moves)
-      (let ((xy (select-random moves)))
-	(try-move-creature creature (car xy) (cdr xy))))))
-
 (defun tick-world ()
   (tick-creatures (level-creatures *game-current-level*))
   (debug-print 50 "Ticking.~%"))
@@ -454,6 +442,7 @@
 (defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
+    (debug-print 50 "INITIALIZING GAME HELLO")
     (setf *game-current-level* (create-level-generated map-width map-height))
     (setf *game-player* (spawn-creature 
 			 (make-creature
@@ -479,7 +468,8 @@
 		     :name n-monster
 		     :hp 10
 		     :max-hp 10
-		     :ai #'ai-random-walk)
+		     :darkvision t
+		     :ai #'ai-fair-search-player-and-destroy)
 		    *game-current-level*)
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+

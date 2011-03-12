@@ -62,4 +62,7 @@
 	  :initform nil
 	  :initarg :level)
    (fov :accessor creature-fov
-	:initform nil)))
+	:initform nil)
+   (darkvision :accessor creature-darkvision
+	       :initform nil
+	       :initarg :darkvision)))

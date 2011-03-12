@@ -1,12 +1,13 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender (hp nil))
+(defun make-creature (&key appearance name max-hp ai gender (hp nil) (darkvision nil))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
 		 :hp (if (null hp) max-hp hp)
 		 :max-hp max-hp
 		 :gender gender
+		 :darkvision darkvision
 		 :ai ai))
 
 (defmethod set-position ((creature creature) x y level)
@@ -51,8 +52,19 @@
       creature
     (aref fov (car xy) (cdr xy))))
 
+(defun xys-adjacent? (xy0 xy1)
+  (let ((dx (- (car xy0) (car xy1)))
+	(dy (- (cdr xy0) (cdr xy1))))
+    (and (<= (abs dx) 1)
+	 (<= (abs dy) 1))))
+
+(defmethod adjacent-to? ((alpha creature) (beta creature))
+  (xys-adjacent? (creature-xy alpha)
+		 (creature-xy beta)))
+  
+
 (defmethod has-darkvision? ((creature creature))
-  t)
+  (with-slots (darkvision) creature darkvision))
 
 (defmethod alive? ((creature creature))
   (with-slots (hp)
@@ -77,7 +89,7 @@
     (unless (not player-visible)
       (buffer-show-cap "~a ~a! (~a ~a)"
 		       (dnoun-verbs a-noun v-attack)
-		       t-noun
+		       (definite-noun t-noun)
 		       hit-chance
 		       dice-roll))
     (cond ((not (roll-success? hit-chance))
@@ -87,7 +99,7 @@
 	   (let ((damage (roll-result? dice-roll)))
 	     (buffer-show-cap "~a ~a for ~a damage!"
 			      (dnoun-verbs (third-person attacker) v-strike)
-			      t-noun
+			      (definite-noun t-noun)
 			      damage)
 	     (damage target damage))))))
 

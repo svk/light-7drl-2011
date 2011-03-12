@@ -38,6 +38,11 @@
 (defparameter *game-braziers* nil)
 (defparameter *game-creatures* nil)
 
+(defun sign (n)
+  (cond ((> n 0) 1)
+	((< n 0) -1)
+	(t 0)))
+
 (defmacro const (x)
   `#'(lambda () ,x))
 

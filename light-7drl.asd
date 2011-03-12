@@ -9,11 +9,13 @@
 			:depends-on ("package"))
 		 (:file "dungeon"
 			:depends-on ("package"))
+		 (:file "ai"
+			:depends-on ("package"))
 		 (:file "rolls"
 			:depends-on ("package"))
 		 (:file "creature"
-			:depends-on ("rolls" "world-structs" "grammar" "package" "globals"))
+			:depends-on ("ai" "rolls" "world-structs" "grammar" "package" "globals"))
 		 (:file "world"
-			:depends-on ("rolls" "world-structs" "grammar" "creature" "package" "globals"))
+			:depends-on ("ai" "rolls" "world-structs" "grammar" "creature" "package" "globals"))
 		 (:file "main"
 			:depends-on ("world-structs" "grammar" "creature" "package" "globals" "world"))))

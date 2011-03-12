@@ -1,0 +1,36 @@
+(defun ai-random-walk (creature)
+  (debug-print 50 "AI random-walk triggers on ~a." (creature-name creature))
+  (let ((moves (remove-if-not #'(lambda (dxdy)
+				  (creature-can-walk? creature 
+						      (tile-at (creature-level creature)
+							       (+ (creature-x creature) (car dxdy))
+							       (+ (creature-y creature) (cdr dxdy)))))
+			      *directions*)))
+    (unless (null moves)
+      (let ((xy (select-random moves)))
+	(try-move-creature creature (car xy) (cdr xy))))))
+
+(defun make-step-or-random (creature step)
+  (if (or (null step)
+	  (not (try-move-creature creature (car step) (cdr step))))
+      (ai-random-walk creature)))
+
+(defun naive-step-to (target creature)
+  (let* ((x1y1 (creature-xy target))
+	 (x0y0 (creature-xy creature))
+	 (dx (- (car x1y1) (car x0y0)))
+	 (dy (- (cdr x1y1) (cdr x0y0))))
+    (cons (sign dx) (sign dy))))
+
+(defun ai-fair-search-player-and-destroy (creature)
+  (let ((target *game-player*))
+    (cond ((not (visible-to? target creature))
+	   (debug-print 50 "FSPD ai: player not visible~%")
+	   (ai-random-walk creature))
+	  ((adjacent-to? target creature)
+	   (debug-print 50 "FSPD ai: player adjacent~%")
+	   (melee-attack target creature))
+	  (t
+	   (debug-print 50 "FSPD ai: seeking path to player~%")
+	   (make-step-or-random creature (naive-step-to target creature))))))
+	  
