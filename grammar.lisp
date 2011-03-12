@@ -86,9 +86,9 @@
 (defnoun n-monster "a" "monster" "monsters")
 (defnoun-uncountable n-tea "tea")
 
-(defnoun-uncountable n-he "he")
-(defnoun-uncountable n-she "she")
-(defnoun-uncountable n-it "it")
+(defnoun-uncountable n-he "he" nil)
+(defnoun-uncountable n-she "she" nil)
+(defnoun-uncountable n-it "it" nil)
 
 (defnoun n-creature "a" "creature" "creatures")
 (defnoun n-small-creature "a" "small creature" "small creatures")

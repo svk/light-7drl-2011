@@ -109,7 +109,7 @@
 	(let ((entry (if (<= (cdr entry-with-count) 1)
 			 (car entry-with-count)
 			 (format nil "~a [x~a]" (car entry-with-count) (cdr entry-with-count)))))
-	  (unless (> y-offset +ui-top-lines+)
+	  (unless (>= y-offset +ui-top-lines+)
 	    (incf y-offset (tcod:console-print-rect-ex tcod:*root*
 						       0
 						       y-offset

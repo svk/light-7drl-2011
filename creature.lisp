@@ -36,16 +36,13 @@
     (setf fov
 	  (or fov
 	      (let ((fov-map (level-acquire-obstacle-map level)))
-		(debug-print 50 "We have obstacle map: ~a~%" (null fov-map))
 		(tcod:map-compute-fov fov-map
 				      (car xy)
 				      (cdr xy)
 				      (max (level-width level) (level-height level))
 				      t
 				      :fov-shadow)
-		(debug-print 50 "Computed")
 		(let ((rv (extract-fov fov-map)))
-		  (debug-print 50 "Releasing!")
 		  (level-release-obstacle-map level fov-map)
 		  rv))))))
 
