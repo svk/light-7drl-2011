@@ -57,6 +57,9 @@
 			     (cons -1 0)              (cons 1 0)
 			     (cons -1 1)  (cons 0 1)  (cons 1 1)))
 
+(defparameter *opposite-direction-indices*
+  (list 7 6 5 4 3 2 1 0))
+
 (defparameter *cardinal-directions* (list
 			                  (cons 0 -1)            
 			     (cons -1 0)              (cons 1 0)

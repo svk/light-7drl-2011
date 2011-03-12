@@ -157,6 +157,7 @@
 		 (aref room dx dy))))))))
 
 (defun ca-stabilize (array f)
+  (debug-print 50 "Before stabilization:~%~a~%" array)
   (do ((next-array (make-array (array-dimensions array)))
 	(unstable t))
       ((not unstable) array)
@@ -168,10 +169,10 @@
 			  f
 			  old-cell
 			  (mapcar #'(lambda (xy)
-				      (aref array (car xy) (cdr xy)))
-				  (remove-if-not #'(lambda (xy)
-						     (array-in-bounds-p array (car xy) (cdr xy)))
-						 (neighbours-of x y))))))
+				      (if (array-in-bounds-p array (car xy) (cdr xy))
+					  (aref array (car xy) (cdr xy))
+					  nil))
+				  (neighbours-of x y)))))
 	  (setf unstable (or unstable
 			     (not (equal old-cell new-cell)))
 		(aref next-array x y) new-cell))))
@@ -188,9 +189,24 @@
 	       +sketch-floor+)))
     (ca-stabilize array #'f)))
 
+(defun no-opposite-floors (neighbours)
+  (dotimes (dir 8)
+    (if (and (equal (nth dir neighbours) +sketch-floor+)
+	     (equal (nth (nth dir *opposite-direction-indices*) neighbours) +sketch-floor+))
+	(return-from no-opposite-floors nil)))
+  t)
+
+(defun f-remove-islands-and-thin-walls (old-cell neighbours)
+  (if (not (equal old-cell +sketch-wall+))
+      old-cell
+      (if (and (no-opposite-floors neighbours))
+	  +sketch-wall+
+	  +sketch-floor+)))
+
 (defun generate-cave (width height)
-  (ca-remove-islands
+  (ca-stabilize
    (coordinates->array
-    (pollock-generator width height 1/2 #'(lambda () (drunken-walks 10 10)))
+    (pollock-generator width height 1/2 #'(lambda () (drunken-walks 10 5)))
     width
-    height)))
+    height)
+   #'f-remove-islands-and-thin-walls))

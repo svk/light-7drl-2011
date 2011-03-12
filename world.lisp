@@ -454,7 +454,7 @@
 			  :max-hp 20)
 			 *game-current-level*))
     (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
-    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.9) 1 t)))
+    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
       (dolist (ls light-sources)
 	(push ls *game-braziers*))
       (debug-print 50 "Generated light sources: ~a.~%" light-sources))
