@@ -6,10 +6,13 @@
     (setf obstacle-map omap)))
 
 (defmethod print-object ((level level) stream)
-    (format stream "[Level]"))
+  (format stream "[Level]"))
 
 (defmethod print-object ((ls light-source) stream)
-    (format stream "[light source at ~a ~a]" (light-source-x ls) (light-source-y ls)))
+  (format stream "[light source at ~a ~a]" (light-source-x ls) (light-source-y ls)))
+
+(defmethod print-object ((creature creature) stream)
+  (format stream "[Creature: ~a]" (definite-noun (creature-name creature))))
 
 (defun set-tcod-opacity-map (map fov-map)
   (let ((width (car (array-dimensions map)))
@@ -26,6 +29,8 @@
   (with-slots (obstacle-map obstacle-map-updated tiles)
       level
     (let ((rv obstacle-map))
+      (unless (null rv)
+	(debug-print 50 "Acquired obstacle map..~%"))
       (unless (or (null obstacle-map)
 		  obstacle-map-updated)
 	(set-tcod-opacity-map tiles obstacle-map))
@@ -34,6 +39,7 @@
 
 (defun level-release-obstacle-map (level omap)
   (unless (null omap)
+      (debug-print 50 "Released obstacle map..~%")
     (level-set-obstacle-map level omap)))
 
 (defun apply-to-all-tiles (map f)
@@ -402,9 +408,9 @@
       ((not (null (tile-creature target)))
        (let* ((creature (tile-creature target))
 	      (c-name (creature-name creature)))
-	 (buffer-show-cap
-	  "~a ~a!" (inoun-verbs n-you v-kill) (definite-noun (creature-name creature)))
-	 (remove-from-map creature)))
+	 (melee-attack creature *game-player*)
+	 (unless (not (alive? creature))
+	   (melee-attack *game-player* creature))))
       (t 
        (let ((old-tile (creature-tile *game-player*))
 	     (new-tile (try-move-creature *game-player* dx dy)))

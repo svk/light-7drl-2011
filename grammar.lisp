@@ -86,6 +86,14 @@
 (defnoun n-monster "a" "monster" "monsters")
 (defnoun-uncountable n-tea "tea")
 
+(defnoun-uncountable n-he "he")
+(defnoun-uncountable n-she "she")
+(defnoun-uncountable n-it "it")
+
+(defnoun n-creature "a" "creature" "creatures")
+(defnoun n-small-creature "a" "small creature" "small creatures")
+(defnoun n-large-creature "a" "large creature" "large creatures")
+
 (defmacro defverb-23p (name present-second present-third)
   (let ((sym (gensym)))
     `(defparameter ,name

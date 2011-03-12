@@ -61,5 +61,5 @@
    (level :accessor creature-level
 	  :initform nil
 	  :initarg :level)
-   (fov :accessor creature-level
+   (fov :accessor creature-fov
 	:initform nil)))
