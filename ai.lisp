@@ -156,7 +156,45 @@
 	      (setf best-step (cons dx dy)
 		    best-value dist)))))
     best-step))
-    
+
+(defun install-stateai (creature ai-f &rest rest)
+  (setf (creature-ai creature)
+	(apply ai-f (cons creature rest))))
+
+(defun stateai-harmless-until-provoked (creature delay)
+  (let ((state :harmless)
+	(cooldown nil))
+    (install-hook creature
+		  :after-attacked
+		  #'(lambda (attacker)
+		      (unless (not (alive? creature))
+			(unless (not (eq attacker *game-player*))
+			  (unless (eq state :provoked)
+			    (emit-visual creature
+					 (format nil
+						 "~a becomes enraged!"
+						 (definite-noun (creature-name creature)))))
+			  (setf state :provoked
+				cooldown delay)))))
+    #'(lambda (creature)
+	(case state
+	  (:harmless (ai-random-walk creature))
+	  (:provoked
+	   (cond ((not (visible-to? *game-player* creature))
+		  (decf cooldown)
+		  (if (<= cooldown 0)
+		      (setf state :harmless)
+		      (emit-visual creature
+				   (format nil
+					   "~a calms down."
+					   (definite-noun (creature-name creature))))))
+		 ((ai-trigger-imperfection?)
+		  (ai-random-walk creature))
+		 (t (ai-search-player-and-destroy creature))))))))
+
+(let ((ai-success-chance (make-chance-roll :success-chance 6/7)))
+  (defun ai-trigger-imperfection? ()
+    (not (roll-success? ai-success-chance))))
 
 (defun ai-search-player-and-destroy (creature)
   (let ((target *game-player*))

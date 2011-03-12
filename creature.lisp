@@ -92,6 +92,22 @@
       (and (or (not (tile-dark (creature-tile target)))
 	       (has-darkvision? observer))
 	   (is-in-fov? target (get-fov observer)))))
+
+(defmethod emit-visual ((creature creature) message)
+  (unless (not (visible-to? creature *game-player*))
+    (buffer-show-cap message)))
+
+(defmethod run-hooks ((creature creature) hook-name &rest rest)
+  (with-slots (hooks)
+      creature
+    (dolist (f (gethash hook-name hooks nil))
+      (apply f rest))))
+
+(defmethod install-hook ((creature creature) hook-name f)
+  (with-slots (hooks)
+      creature
+    (let ((current-hooks (gethash hook-name hooks nil)))
+      (setf (gethash hook-name hooks) (cons f current-hooks)))))
   
 (defmethod melee-attack ((target creature) (attacker creature))
   (with-slots (base-hit-chance base-damage attack-verb hit-verb miss-verb)
@@ -118,7 +134,8 @@
 				(dnoun-verbs (third-person attacker) hit-verb)
 				(definite-noun t-noun)
 				damage)
-	       (damage target damage)))))))
+	       (damage target damage))))
+      (run-hooks target :after-attacked attacker))))
 
 (defmethod third-person ((creature creature))
   (with-slots (gender)
@@ -130,16 +147,19 @@
 (defmethod creature-death-verb ((creature creature))
   v-die)
 
+(defmethod die ((creature creature))
+  (run-hooks creature :before-death)
+  (remove-from-map creature)
+  (unless (not (visible-to? creature *game-player*))
+    (buffer-show-cap "~a!" (dnoun-verbs (creature-name creature)
+					(creature-death-verb creature)))))
+  
 (defmethod damage ((creature creature) pts)
   (with-slots (hp)
       creature
-    (let ((player-visible (visible-to? creature *game-player*)))
-      (decf hp pts)
-      (unless (> hp 0)
-	(remove-from-map creature)
-	(unless (not player-visible)
-	  (buffer-show-cap "~a!" (dnoun-verbs (creature-name creature)
-					      (creature-death-verb creature))))))))
+    (decf hp pts)
+    (unless (> hp 0)
+      (die creature))))
   
 
 (defmethod remove-from-map ((creature creature))

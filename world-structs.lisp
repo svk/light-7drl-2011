@@ -73,5 +73,6 @@
    (hit-verb :initarg :hit-verb)
    (miss-verb :initarg :miss-verb)
    (speed :initarg :speed
-	  :initform 1)))
+	  :initform 1)
+   (hooks :initform (make-hash-table))))
 	  

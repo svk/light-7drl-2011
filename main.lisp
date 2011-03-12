@@ -23,139 +23,136 @@
 
 (defun game-loop ()
   (do* ((*game-running* t)
-	(terrain-updated t)
 	(fov-updated t)
 	(player-last-xy nil)
 	(tcod-black (tcod:compose-colour 0 0 0))
 	(tcod-white (tcod:compose-colour 255 255 255)))
        ((not *game-running*))
     (debug-print 2000 "Looping.~%")
-    (tcod:console-set-default-background tcod:*root* tcod-black)
-    (tcod:console-clear tcod:*root*)
-    (unless (null *game-player*)
-      (let ((map-width (level-width *game-current-level*))
-	    (map-height (level-height *game-current-level*))
-	    (tiles (level-tiles *game-current-level*)))
-	(unless (eq (creature-xy *game-player*) player-last-xy)
-	  (setf fov-updated t)
-	  (setf player-last-xy (creature-xy *game-player*)))
-	(unless (not fov-updated)
-	  (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
-	    (debug-print 50 "Updating FOV and lighting.~%")
-	    (clear-lighting)
-	    (add-light-from-source *game-torch* fov-map)
-	    (dolist (brazier *game-braziers*)
-	      (add-light-from-source brazier fov-map))
-	    (tcod:map-compute-fov fov-map
-				  (car (creature-xy *game-player*))
-				  (cdr (creature-xy *game-player*))
-				  (+ map-width map-height)
-				  t
-				  :fov-shadow)
-	    (dotimes (x map-width)
-	      (dotimes (y map-height)
-		(let ((tile (tile-at *game-current-level* x y)))
-		  (debug-print 2000 "Lighting at ~a ~a is ~a.~%" x y (tile-lighting tile))
-		  (setf (tile-visible (aref tiles x y))
-			(and 
-			 (not (tile-dark tile))
-			 (tcod:map-is-in-fov? fov-map x y))))))
-	    (setf fov-updated nil)
-	    (level-release-obstacle-map *game-current-level* fov-map)))
-	(dotimes (x map-width)
-	  (dotimes (y map-height)
-	    (let* ((tile (aref tiles x y))
-		   (appearance (appearance-at tile))
-		   (bg-light (coerce (min 1 (tile-lighting tile)) 'float))
-		   (fg-light (coerce (min 1 (tile-lighting tile)) 'float))
-		   (visible (tile-visible tile)))
-	      (unless (null (tile-creature tile))
-		(setf fg-light (coerce (max fg-light +minimum-fg-light+) 'float)))
-	      (unless (not (and (= x (player-x))
-				(= y (player-y))))
-		(setf visible t))
-	      (unless (not (and (<= (abs (- x (player-x))) 1)
-				(<= (abs (- y (player-y))) 1)
-				(not (tile-walkable tile))))
-		(setf fg-light (coerce (max fg-light +minimum-touched-light+) 'float))
-		(setf bg-light (coerce (max bg-light +minimum-touched-light+) 'float))
-		(setf visible t))
-	      (unless (not *cheat-lightall*)
-		(setf visible t
-		      bg-light 1.0
-		      fg-light 1.0))
-	      (unless (not visible)
-		(tcod:console-put-char-ex tcod:*root*
-					  x
-					  (+ y +ui-top-lines+)
-					  (appearance-glyph appearance)
-					  (tcod:color-multiply-scalar
-					   (apply #'tcod:compose-colour
-						  (appearance-foreground-colour appearance))
-					   fg-light)
-					  (tcod:color-multiply-scalar
-					   (apply #'tcod:compose-colour
-						  (appearance-background-colour appearance))
-					   bg-light))))))))
-
-    (debug-print 50 "Printing game-text-buffer: ~a.~%" *game-text-buffer*)
-    
-    (let ((y-offset 0))
-      (tcod:console-set-default-background tcod:*root*
-					   (tcod:compose-colour 0 0 0))
-      (tcod:console-set-default-foreground tcod:*root*
-					   (tcod:compose-colour 0 255 255))
-      (block buffer-print-loop
-	(do* ((entries (reverse *game-text-buffer*) (cdr entries))
-	      (entry-with-count (car entries) (car entries)))
-	     ((null entries))
-	  (let ((entry (if (<= (cdr entry-with-count) 1)
-			   (car entry-with-count)
-			   (format nil "~a [x~a]" (car entry-with-count) (cdr entry-with-count)))))
-	    (if (< y-offset +ui-top-lines+)
-		(incf y-offset (tcod:console-print-rect-ex tcod:*root*
-							   0
-							   y-offset
-							   +screen-width+
-							   (- +ui-top-lines+ y-offset)
-							   :set
-							   :left
-							   entry))
-		(return-from buffer-print-loop
-		  (progn
-		    (tcod:console-print-rect-ex tcod:*root*
-						0
-						y-offset
-						+screen-width+
-						1
-						:set
-						:left
-						"[More]")
-		    (setf *buffer-clear-time* nil)
-		    (query-space-or-enter #'(lambda ()
-					      (setf *game-text-buffer* (reverse entries)))))))))))
-    (unless (not *buffer-clear-time*)
-      (debug-print 50 "Buffer wrap up time~%")
-      (buffer-clear))
-    (tcod:console-set-default-background tcod:*root*
-					 (tcod:compose-colour 0 0 0))
-    (tcod:console-set-default-foreground tcod:*root*
-					 (tcod:compose-colour 255 255 255))
-    (tcod:console-print-ex tcod:*root*
-			   0
-			   (- +screen-height+ +ui-bottom-lines+)
-			   :set
-			   :left
-			   (make-statusline))
-    (tcod:console-print-ex tcod:*root*
-			   0
-			   (+ 1 (- +screen-height+ +ui-bottom-lines+))
-			   :set
-			   :left
-			   (make-statusline-2))
-    
+    (if (not (null *game-special-screen-stack*))
+	(funcall (car *game-special-screen-stack*))
+	(progn
+	  (tcod:console-set-default-background tcod:*root* tcod-black)
+	  (tcod:console-clear tcod:*root*)
+	  (unless (null *game-player*)
+	    (let ((map-width (level-width *game-current-level*))
+		  (map-height (level-height *game-current-level*))
+		  (tiles (level-tiles *game-current-level*)))
+	      (unless (eq (creature-xy *game-player*) player-last-xy)
+		(setf fov-updated t)
+		(setf player-last-xy (creature-xy *game-player*)))
+	      (unless (not fov-updated)
+		(let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
+		  (debug-print 50 "Updating FOV.~%")
+		  (tcod:map-compute-fov fov-map
+					(car (creature-xy *game-player*))
+					(cdr (creature-xy *game-player*))
+					(+ map-width map-height)
+					t
+					:fov-shadow)
+		  (dotimes (x map-width)
+		    (dotimes (y map-height)
+		      (let ((tile (tile-at *game-current-level* x y)))
+			(debug-print 2000 "Lighting at ~a ~a is ~a.~%" x y (tile-lighting tile))
+			(setf (tile-visible (aref tiles x y))
+			      (and 
+			       (not (tile-dark tile))
+			       (tcod:map-is-in-fov? fov-map x y))))))
+		  (setf fov-updated nil)
+		  (level-release-obstacle-map *game-current-level* fov-map)))
+	      (dotimes (x map-width)
+		(dotimes (y map-height)
+		  (let* ((tile (aref tiles x y))
+			 (appearance (appearance-at tile))
+			 (bg-light (coerce (min 1 (tile-lighting tile)) 'float))
+			 (fg-light (coerce (min 1 (tile-lighting tile)) 'float))
+			 (visible (tile-visible tile)))
+		    (unless (null (tile-creature tile))
+		      (setf fg-light (coerce (max fg-light +minimum-fg-light+) 'float)))
+		    (unless (not (and (= x (player-x))
+				      (= y (player-y))))
+		      (setf visible t))
+		    (unless (not (and (<= (abs (- x (player-x))) 1)
+				      (<= (abs (- y (player-y))) 1)
+				      (not (tile-walkable tile))))
+		      (setf fg-light (coerce (max fg-light +minimum-touched-light+) 'float))
+		      (setf bg-light (coerce (max bg-light +minimum-touched-light+) 'float))
+		      (setf visible t))
+		    (unless (not *cheat-lightall*)
+		      (setf visible t
+			    bg-light 1.0
+			    fg-light 1.0))
+		    (unless (not visible)
+		      (tcod:console-put-char-ex tcod:*root*
+						x
+						(+ y +ui-top-lines+)
+						(appearance-glyph appearance)
+						(tcod:color-multiply-scalar
+						 (apply #'tcod:compose-colour
+							(appearance-foreground-colour appearance))
+						 fg-light)
+						(tcod:color-multiply-scalar
+						 (apply #'tcod:compose-colour
+							(appearance-background-colour appearance))
+						 bg-light))))))))
+	  
+	  (debug-print 50 "Printing game-text-buffer: ~a.~%" *game-text-buffer*)
+	  
+	  (let ((y-offset 0))
+	    (tcod:console-set-default-background tcod:*root*
+						 (tcod:compose-colour 0 0 0))
+	    (tcod:console-set-default-foreground tcod:*root*
+						 (tcod:compose-colour 0 255 255))
+	    (block buffer-print-loop
+	      (do* ((entries (reverse *game-text-buffer*) (cdr entries))
+		    (entry-with-count (car entries) (car entries)))
+		   ((null entries))
+		(let ((entry (if (<= (cdr entry-with-count) 1)
+				 (car entry-with-count)
+				 (format nil "~a [x~a]" (car entry-with-count) (cdr entry-with-count)))))
+		  (if (< y-offset +ui-top-lines+)
+		      (incf y-offset (tcod:console-print-rect-ex tcod:*root*
+								 0
+								 y-offset
+								 +screen-width+
+								 (- +ui-top-lines+ y-offset)
+								 :set
+								 :left
+								 entry))
+		      (return-from buffer-print-loop
+			(progn
+			  (tcod:console-print-rect-ex tcod:*root*
+						      0
+						      y-offset
+						      +screen-width+
+						      1
+						      :set
+						      :left
+						      "[More]")
+			  (setf *buffer-clear-time* nil)
+			  (query-space-or-enter #'(lambda ()
+						    (setf *game-text-buffer* (reverse entries)))))))))))
+	  (unless (not *buffer-clear-time*)
+	    (debug-print 50 "Buffer wrap up time~%")
+	    (buffer-clear))
+	  (tcod:console-set-default-background tcod:*root*
+					       (tcod:compose-colour 0 0 0))
+	  (tcod:console-set-default-foreground tcod:*root*
+					       (tcod:compose-colour 255 255 255))
+	  (tcod:console-print-ex tcod:*root*
+				 0
+				 (- +screen-height+ +ui-bottom-lines+)
+				 :set
+				 :left
+				 (make-statusline))
+	  (tcod:console-print-ex tcod:*root*
+				 0
+				 (+ 1 (- +screen-height+ +ui-bottom-lines+))
+				 :set
+				 :left
+				 (make-statusline-2))))
     (tcod:console-flush)
-    
+	  
     (debug-print 100 "Handling input.~%")
 
     (debug-print 100 "Before input, game-text-buffer is: ~a.~%" *game-text-buffer*)
@@ -222,7 +219,17 @@
 	      (#\u (move-command 1 -1))
 	      (#\b (move-command -1 1))
 	      (#\n (move-command 1 1))
-	      (#\. (player-took-action))
+	      (:kp4 (move-command -1 0))
+	      (:kp2 (move-command 0 1))
+	      (:kp8 (move-command 0 -1))
+	      (:kp6 (move-command 1 0))
+	      (:kp7 (move-command -1 -1))
+	      (:kp9 (move-command 1 -1))
+	      (:kp1 (move-command -1 1))
+	      (:kp3 (move-command 1 1))
+	      (#\E (die *game-player*))
+	      (#\W (signal 'game-over :type :victory))
+	      (#\. (player-wait))
 	      (#\d (try-player-drop-stack))
 	      (#\, (try-player-pick-up-stack))
 	      (#\V (toggle *cheat-lightall*))
@@ -234,6 +241,7 @@
 
 (defun start-game ()
   (let* ((game-title "Light7DRL"))
+    (uninitialize-game)
     (debug-print 50 "Running with logging level ~a.~%" *debug-level*)
     (load-libraries)
     (tcod:console-set-custom-font *tileset-file*
@@ -251,7 +259,34 @@
       (initialize-first-game)
       (setf *game-initialized* t))
     (debug-print 100 "Entering loop.~%")
-    (game-loop)
+    (block main-game
+      (handler-bind
+	  ((game-over #'(lambda (condition)
+			  (with-slots (type)
+			      condition
+			    (debug-print 1 "Game over: ~a.~%" type))
+			  (query-space-or-enter
+			   #'(lambda ()
+			       (push-special-screen
+				(with-slots (type)
+				    condition
+				  (cond ((eq type :death)
+					 (make-game-over-death-screen condition))
+					((eq type :victory)
+					 (make-game-over-victory-screen condition))
+					(t (make-centered-text-special-screen "Game over! ..wait, what?")))))
+			       (query-space-or-enter
+				#'(lambda ()
+				    (pop-special-screen)
+				    (uninitialize-game)
+				    (buffer-clear)
+				    (query-confirm
+				     "Play again?"
+				     #'(lambda ()
+					 (initialize-first-game))
+				     #'(lambda ()
+					 (return-from main-game))))))))))
+	(game-loop)))
     (debug-print 100 "End loop.~%")))
   
 

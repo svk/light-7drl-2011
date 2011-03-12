@@ -267,9 +267,23 @@
 (defun find-random-walkable (map)
   (select-random (find-walkables map)))
 
+(defun update-world ()
+  (clear-lighting)
+  (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
+    (add-light-from-source *game-torch* fov-map)
+    (dolist (brazier *game-braziers*)
+      (add-light-from-source brazier fov-map))
+    (level-release-obstacle-map *game-current-level* fov-map)))
+  
+
 (defun tick-world ()
   (tick-creatures (level-creatures *game-current-level*))
-  (debug-print 50 "Ticking.~%"))
+  (debug-print 50 "Ticking.~%")
+  (update-world))
+
+(defun player-wait ()
+  (player-taking-action)
+  (player-took-action))
 
 (defun player-taking-action ()
   (buffer-clear))
@@ -380,7 +394,7 @@
 			    (definite-noun (item-name item)))
 		    #'(lambda () (try-player-drop item t))))
     (t (unless (null (creature-drop *game-player* item))
-	 (buffer-show "You drop ~a." (definite-noun (item-name item)))))))
+	 (buffer-show "You drop your ~a." (noun-singular (item-name item)))))))
 
 (defun try-player-drop-stack ()
   (if (null (creature-items *game-player*))
@@ -403,9 +417,9 @@
       ((or (null target) (not (tile-walkable target)))
        (buffer-show "The way is blocked."))
       ((not (null (tile-creature target)))
-       (let* ((creature (tile-creature target))
-	      (c-name (creature-name creature)))
-	 (melee-attack creature *game-player*)))
+       (let* ((creature (tile-creature target)))
+	 (melee-attack creature *game-player*)
+	 (player-took-action)))
       (t 
        (let ((old-tile (creature-tile *game-player*))
 	     (new-tile (try-move-creature *game-player* dx dy)))
@@ -446,10 +460,19 @@
 					     (#\f :female)
 					     (t nil))))))))
 
+(defun uninitialize-game ()
+  (setf *game-special-screen-stack* nil
+	*game-text-buffer* nil
+	*game-current-level* nil
+	*game-player* nil
+	*game-initialized* nil))
+
 (defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
     (debug-print 50 "INITIALIZING GAME HELLO")
+    (push-hooks #'ignore-input)
+    (push-special-screen (make-centered-text-special-screen "Please wait..."))
     (setf *game-current-level* (create-level-generated map-width map-height))
     (setf *game-player* (spawn-creature 
 			 (make-creature
@@ -461,9 +484,13 @@
 			  :damage (make-dice-roll :number-of-dice 2
 						  :dice-size 6
 						  :constant 4)
-			  :hp 20
-			  :max-hp 20)
+			  :max-hp 100)
 			 *game-current-level*))
+    (install-hook *game-player* :before-death
+		  #'(lambda ()
+		      (debug-print 1 "Triggering player death hook.~%")
+		      (signal 'game-over
+			      :type :death)))
     (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
     (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
       (dolist (ls light-sources)
@@ -479,15 +506,17 @@
 		      :appearance (make-appearance :glyph (char-code #\~)
 						   :foreground-colour '(0 0 0))
 		      :name n-monster
-		      :speed 2
-		      :hp 10
-		      :max-hp 10
+		      :speed 1
+		      :max-hp 50
 		      :hit-chance (make-chance-roll :success-chance 3/4)
 		      :damage (make-dice-roll :number-of-dice 1
-					      :dice-size 0)
-		      :darkvision t
-		      :ai #'ai-test)))
+					      :dice-size 6
+					      :constant 4)
+		      :darkvision t)))
 	(debug-print 50 "created unspawned creature: ~a.~%" monster)
+	(install-stateai monster
+			 #'stateai-harmless-until-provoked
+			 10)
 	(spawn-creature monster *game-current-level*)))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
@@ -499,7 +528,10 @@
     (buffer-show "Welcome to Light7DRL!")
     (buffer-show "How pitiful ~a tale!" (player-possessive))
     (buffer-show "How rare ~a beauty!" (player-possessive))
-    (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)))
+    (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)
+    (update-world)
+    (pop-hooks)
+    (pop-special-screen)))
 
 (defun player-possessive ()
   (third-person-possessive (creature-gender *game-player*)))

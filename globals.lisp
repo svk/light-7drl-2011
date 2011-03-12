@@ -82,6 +82,15 @@
 
 (defparameter *game-input-hooks-stack* nil)
 
+(defparameter *game-special-screen-stack* nil)
+
+(defun push-special-screen (f)
+  (push f *game-special-screen-stack*)
+  (funcall f))
+
+(defun pop-special-screen ()
+  (pop *game-special-screen-stack*))
+
 (defun buffer-show (&rest rest)
   (let ((string (apply #'format (cons nil rest))))
     (if (equal (caar *game-text-buffer*) string)
@@ -150,12 +159,12 @@
 		  (declare (ignore stack))
 		  (case value
 		    (#\y (buffer-clear)
-			 (funcall f-yes)
-			 (pop-hooks))
+			 (pop-hooks)
+			 (funcall f-yes))
 		    (#\n (buffer-clear)
+			 (pop-hooks)
 			 (unless (null f-no)
-			   (funcall f-no))
-			 (pop-hooks))
+			   (funcall f-no)))
 		    (t
 		     (buffer-clear)
 		     (buffer-show "~a [y/n]" question))))))
@@ -164,6 +173,10 @@
   (if (zerop (length s))
       nil
       s))
+
+(defun ignore-input (value stack)
+  (declare (ignore value)
+	   (ignore stack)))
 
 (defun query-string (description f-string &key (filter #'identity) (limit nil) (accept #'any-nonempty))
   (let ((buffer nil))
@@ -214,3 +227,7 @@
 
 (defparameter *ai-test-fleeing* nil)
 
+(define-condition game-over ()
+  ((type :initarg :type)))
+  
+  
