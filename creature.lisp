@@ -69,10 +69,3 @@
     (unless (null (creature-tile creature))
       (setf (tile-creature (creature-tile creature)) nil))))
 
-
-
-
-
-
-
-
