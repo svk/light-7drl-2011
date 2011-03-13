@@ -6,7 +6,7 @@
 ;;      `(format t ,@rest)
 ;;      nil))
 
-(defparameter *debug-level* 50)
+(defparameter *debug-level* 0)
 
 (defun debug-print (level &rest rest)
   (unless (not (and (boundp '*debug-level*)

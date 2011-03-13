@@ -370,7 +370,6 @@
 (defun create-level-generated (width height)
   (let ((level (create-level width height))
 	(sketch (generate-cave (- width 2) (- height 2))))
-    (format t "~a" sketch)
     (dotimes (x width)
       (dotimes (y height)
 	(setf (aref (level-tiles level) x y)

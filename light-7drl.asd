@@ -14,7 +14,7 @@
 		 (:file "visuals"
 			:depends-on ("package"))
 		 (:file "ai"
-			:depends-on ("package" "rolls" "world-structs"))
+			:depends-on ("package" "rolls" "world-structs" "globals"))
 		 (:file "creature"
 			:depends-on ("ai" "rolls" "world-structs" "grammar" "package" "globals"))
 		 (:file "item"
@@ -26,6 +26,6 @@
 		 (:file "level"
 			:depends-on ("package" "items" "monsters" "dungeon" "world-structs"))
 		 (:file "world"
-			:depends-on ("monsters" "items" "item" "visuals" "ai" "rolls" "world-structs" "grammar" "creature" "package" "globals"))
+			:depends-on ("monsters" "items" "item" "visuals" "ai" "rolls" "world-structs" "grammar" "creature" "package" "globals" "dungeon"))
 		 (:file "main"
 			:depends-on ("ai" "item" "world-structs" "grammar" "creature" "package" "globals" "world"))))

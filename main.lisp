@@ -272,9 +272,9 @@
 	      (#\: (enter-look-mode (object-level *game-player*) (player-x) (player-y)))
 	      (#\Q (query-confirm "Really quit?" #'quit-game))
 
-	      (#\W (go-to-next-level))
-	      (#\A (show-game-ending))
-	      (#\V (toggle *cheat-lightall*))
+;;	      (#\W (go-to-next-level))
+;;	      (#\A (show-game-ending))
+;;	      (#\V (toggle *cheat-lightall*))
 
 	      (t (handle-input value stack)))))))
 
@@ -336,3 +336,18 @@
   (start-game)
   (close-libraries)
   (terminate))
+
+(defun initialize-libtcod ()
+  (cffi:load-foreign-library 'libtcod :search-path "libtcod.so")
+  (setf tcod:*root* (null-pointer)))
+
+(defun sbcl-export (filename)
+  (cffi:close-foreign-library 'libtcod)
+  (sb-ext:save-lisp-and-die
+   filename
+   :executable t
+   :toplevel #'(lambda ()
+		 (setf *random-state* (make-random-state t))
+		 (initialize-libtcod)
+		 (start-game))
+   :purify t))
