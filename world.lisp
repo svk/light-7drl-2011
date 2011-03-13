@@ -931,7 +931,3 @@
       (let ((fov-map (level-acquire-obstacle-map level)))
 	(add-light-from-source light-source fov-map)
 	(level-release-obstacle-map level fov-map)))))
-
-
-
-
