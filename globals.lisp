@@ -137,6 +137,26 @@
 		     (buffer-clear)
 		     (buffer-show "~a" question))))))
 
+(defun translate-movement-input (input)
+  (case input
+    (#\h (cons -1 0))
+    (#\j (cons 0 1))
+    (#\k (cons 0 -1))
+    (#\l (cons 1 0))
+    (#\y (cons -1 -1))
+    (#\u (cons 1 -1))
+    (#\b (cons -1 1))
+    (#\n (cons 1 1))
+    (:kp4 (cons -1 0))
+    (:kp2 (cons 0 1))
+    (:kp8 (cons 0 -1))
+    (:kp6 (cons 1 0))
+    (:kp7 (cons -1 -1))
+    (:kp9 (cons 1 -1))
+    (:kp1 (cons -1 1))
+    (:kp3 (cons 1 1))))
+
+
 (let ((querying-for-more nil))
   (defun query-space-or-enter (f)
     (debug-print 50 "more: ~a~%" querying-for-more)

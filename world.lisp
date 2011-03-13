@@ -470,18 +470,22 @@
       (t 
        (let ((old-tile (creature-tile *game-player*))
 	     (new-tile (try-move-creature *game-player* dx dy)))
-	 (unless (not new-tile)
-	   (move-light-source *game-torch* (player-x) (player-y))
-	   (cond ((and (tile-dark old-tile)
-		       (not (tile-dark new-tile)))
-		  (buffer-show "Your eyes blink as you adjust to the light."))
-		 ((and (not (tile-dark old-tile))
-		       (tile-dark new-tile))
-		  (buffer-show "You stumble into the darkness.")))
-	   (let ((summary (summarize-tile new-tile)))
-	     (unless (zerop (length summary))
-	       (buffer-show summary)))
-	   (player-took-action)))))))
+	 (if (and (tile-dark new-tile)
+		  (eq :hole (tile-special new-tile)))
+	     (go-to-next-level t)
+	     (progn
+	       (unless (not new-tile)
+		 (move-light-source *game-torch* (player-x) (player-y))
+		 (cond ((and (tile-dark old-tile)
+			     (not (tile-dark new-tile)))
+			(buffer-show "Your eyes blink as you adjust to the light."))
+		       ((and (not (tile-dark old-tile))
+			     (tile-dark new-tile))
+			(buffer-show "You stumble into the darkness.")))
+		 (let ((summary (summarize-tile new-tile :local t)))
+		   (unless (zerop (length summary))
+		     (buffer-show summary))))
+		 (player-took-action))))))))
 
 (defun summarize-floor-items (items)
   (let* ((countlist (make-count-list (mapcar #'item-name items)))
@@ -494,27 +498,69 @@
 	(format nil "There's nothing here.")
 	(format nil "There ~a ~a here." (is-are total) (list-join stringlist)))))
 
-(defun summarize-tile (tile)
-  (let* ((items (tile-items tile))
-	 (countlist (make-count-list (mapcar #'item-name items)))
-	 (total (reduce #'+ (mapcar #'cdr countlist))))
-    (if (tile-special tile)
-	(progn
-	  (incf total)
-	  (push (case (tile-special tile)
-		  (:lever (cons n-lever 1))
-		  (:hole (cons n-hole 1)))
-		countlist)))
-    (let ((stringlist (mapcar #'(lambda (noun-count)
-				  (indefinite-counted-noun (car noun-count)
-							   (cdr noun-count)))
-			      countlist)))
-      (if (null stringlist)
-	  (format nil "There's nothing here.")
-	  (capitalize (format nil
-			      "There ~a ~a here." 
-			      (is-are (cdar countlist))
-			      (list-join stringlist)))))))
+(defun summarize-tile (tile &key (local nil))
+  (if (tile-visible tile)
+      (let* ((items (tile-items tile))
+	     (countlist (make-count-list (mapcar #'item-name items)))
+	     (total (reduce #'+ (mapcar #'cdr countlist))))
+	(if (and (tile-creature tile)
+		 (not (eq (tile-creature tile)
+			  *game-player*)))
+	    (progn
+	      (incf total)
+	      (push (cons (creature-name (tile-creature tile))
+			  1)
+		    countlist)))
+	(if (tile-special tile)
+	    (progn
+	      (incf total)
+	      (push (case (tile-special tile)
+		      (:lever (cons n-lever 1))
+		      (:hole (cons n-hole 1)))
+		    countlist)))
+	(let ((stringlist (mapcar #'(lambda (noun-count)
+				      (indefinite-counted-noun (car noun-count)
+							       (cdr noun-count)))
+				  countlist)))
+	  (if (null stringlist)
+	      ""
+	      (if local
+		  (capitalize (format nil
+				      "There ~a ~a here." 
+				      (is-are (cdar countlist))
+				      (list-join stringlist)))
+		  (capitalize (format nil
+				      "~a." 
+				      (list-join stringlist)))))))
+      ""))
+  
+(let ((cursor-x nil)
+      (cursor-y nil))
+  (defun look-mode-highlighted? (x y)
+    (and (eql x cursor-x)
+	 (eql y cursor-y)))
+
+  (defun enter-look-mode (level x y)
+    (setf cursor-x x
+	  cursor-y y)
+    (push-hooks #'(lambda (value stack)
+		    (declare (ignore stack))
+		    (let ((movement-xy (translate-movement-input value)))
+		      (cond (movement-xy
+			     (buffer-clear)
+			     (incf cursor-x (car movement-xy))
+			     (incf cursor-y (cdr movement-xy))
+			     (setf cursor-x (max 0 (min (- +map-width+ 1) cursor-x)))
+			     (setf cursor-y (max 0 (min (- +map-height+ 1) cursor-y)))
+			     (let ((summary (summarize-tile (tile-at level cursor-x cursor-y))))
+			       (unless (zerop (length summary))
+				 (buffer-show summary))))
+			    ((or (eq value :space)
+				 (eq value :enter))
+			     (setf cursor-x nil
+				   cursor-y nil)
+			     (pop-hooks))))))))
+		      
   
 (defun initialize-first-game ()
   (query-string
@@ -536,6 +582,32 @@
 	*game-current-level* nil
 	*game-player* nil
 	*game-initialized* nil))
+
+(defun activate-lever ()
+  (let ((xy (find-eligible-near #'(lambda (tile) (and (not (tile-special tile))
+						      (creature-can-walk? *game-player* tile)))
+				*game-current-level*
+				(player-x)
+				(player-y))))
+    (buffer-show "You pull ~a." (definite-noun n-lever))
+    (place-hole *game-current-level* (car xy) (cdr xy))
+    (buffer-show "You hear a rumbling sound.")
+    (unless (not (tile-visible (tile-at *game-current-level* (car xy) (cdr xy))))
+      (buffer-show "A chunk of the floor loosens and falls beside you!"))))
+
+(defun go-to-next-level (&optional (involuntary nil))
+  (unless (not involuntary)
+    (buffer-show "You fall into a hole!"))
+  (signal 'game-over :type :victory))
+
+(defun try-use-special ()
+  (player-taking-action)
+  (case (tile-special (creature-tile *game-player*))
+    (:lever (activate-lever)
+	    (player-took-action))
+    (:hole (query-confirm "Jump down to the next level?"
+			  #'(lambda ()
+			      (go-to-next-level))))))
 
 (defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
@@ -573,7 +645,7 @@
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
     (debug-print 50 "what the fuck should spawn creature")
     (dotimes (i 5)
-	(spawn-creature (make-snake) *game-current-level*))
+	(spawn-creature (make-rat) *game-current-level*))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+

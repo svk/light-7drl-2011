@@ -82,20 +82,38 @@
 		      (setf visible t
 			    bg-light 1.0
 			    fg-light 1.0))
-		    (unless (not visible)
-		      (tcod:console-put-char-ex tcod:*root*
-						x
-						(+ y +ui-top-lines+)
-						(appearance-glyph appearance)
-						(tcod:color-multiply-scalar
-						 (apply #'tcod:compose-colour
-							(appearance-foreground-colour appearance))
-						 fg-light)
-						(tcod:color-multiply-scalar
-						 (apply #'tcod:compose-colour
-							(appearance-background-colour appearance))
-						 bg-light))))))))
-	  
+		    (let ((fg (tcod:color-multiply-scalar
+			       (apply #'tcod:compose-colour
+				      (appearance-foreground-colour appearance))
+			       fg-light))
+			  (bg (tcod:color-multiply-scalar
+			       (apply #'tcod:compose-colour
+				      (appearance-background-colour appearance))
+			       bg-light)))
+		      (unless (not (look-mode-highlighted? x y))
+			(debug-print 50 "Highlighting! ~a ~a~%" x y)
+			(setf fg (tcod:compose-colour 0 0 0))
+			(setf bg (tcod:compose-colour 255 0 255)))
+		      (cond
+			(visible
+			 (tcod:console-put-char-ex tcod:*root*
+						   x
+						   (+ y +ui-top-lines+)
+						   (if (and (look-mode-highlighted? x y)
+							    (eq (appearance-glyph appearance)
+								+wall-glyph+))
+						       (char-code #\ )
+						       (appearance-glyph appearance))
+						   fg
+						   bg))
+			((look-mode-highlighted? x y)
+			 (tcod:console-put-char-ex tcod:*root*
+						   x
+						   (+ y +ui-top-lines+)
+						   (char-code #\ )
+						   bg
+						   bg)))))))))
+
 	  (debug-print 50 "Printing game-text-buffer: ~a.~%" *game-text-buffer*)
 	  
 	  (let ((y-offset 0))
@@ -212,34 +230,23 @@
 
 (defun make-standard-input-hooks ()
   #'(lambda (value stack)
+      (let ((movement-xy (translate-movement-input value)))
+	(if movement-xy
+	    (move-command (car movement-xy) (cdr movement-xy))
 	    (case value
-	      (#\h (move-command -1 0))
-	      (#\j (move-command 0 1))
-	      (#\k (move-command 0 -1))
-	      (#\l (move-command 1 0))
-	      (#\y (move-command -1 -1))
-	      (#\u (move-command 1 -1))
-	      (#\b (move-command -1 1))
-	      (#\n (move-command 1 1))
-	      (:kp4 (move-command -1 0))
-	      (:kp2 (move-command 0 1))
-	      (:kp8 (move-command 0 -1))
-	      (:kp6 (move-command 1 0))
-	      (:kp7 (move-command -1 -1))
-	      (:kp9 (move-command 1 -1))
-	      (:kp1 (move-command -1 1))
-	      (:kp3 (move-command 1 1))
 	      (#\E (die *game-player*))
 	      (#\W (signal 'game-over :type :victory))
 	      (#\. (player-wait))
+	      (#\a (try-use-special))
 	      (#\d (try-player-drop-stack))
 	      (#\, (try-player-pick-up-stack))
 	      (#\V (toggle *cheat-lightall*))
 	      (#\T (toggle *ai-test-fleeing*))
+	      (#\: (enter-look-mode (object-level *game-player*) (player-x) (player-y)))
 	      (#\X (cheat-spawn-thingy))
 	      (#\C (cheat-spawn-doodad))
 	      (#\Q (query-confirm "Really quit?" #'quit-game))
-	      (t (handle-input value stack)))))
+	      (t (handle-input value stack)))))))
 
 (defun start-game ()
   (let* ((game-title "Light7DRL"))
