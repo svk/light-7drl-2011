@@ -28,22 +28,13 @@
     (dotimes (i speed)
       (funcall ai creature))))
 
-(defmethod emit-light ((creature creature))
-  (with-slots (light-source level)
-      creature
-    (unless (null light-source)
-      (debug-print 50 "Creature ~a is emitting light.~%" creature)
-      (let ((fov-map (level-acquire-obstacle-map level)))
-	(add-light-from-source light-source fov-map)
-	(level-release-obstacle-map level fov-map)))))
-
 (defmethod set-position ((creature creature) x y level)
-  (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (creature-level creature) x y level)
+  (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (object-level creature) x y level)
   (unless (not (null level))
-    (setf level (creature-level creature)))
-  (unless (eq (creature-level creature) level)
-    (unless (null (creature-level creature))
-      (setf (level-creatures (creature-level creature)) (remove creature (level-creatures (creature-level creature)))))
+    (setf level (object-level creature)))
+  (unless (eq (object-level creature) level)
+    (unless (null (object-level creature))
+      (setf (level-creatures (object-level creature)) (remove creature (level-creatures (object-level creature)))))
     (pushnew creature (level-creatures level)))
   (unless (null (creature-tile creature))
     (setf (tile-creature (creature-tile creature)) nil))
@@ -56,7 +47,7 @@
       creature
     (setf stepmap-to nil))
   (setf (tile-creature (tile-at level x y)) creature
-	(creature-level creature) level
+	(object-level creature) level
 	(creature-xy creature) (cons x y)
 	(creature-tile creature) (tile-at level x y)))
 
@@ -104,6 +95,25 @@
   (with-slots (hp)
       creature
     (> hp 0)))
+
+(defmethod radiant-intensity ((creature creature))
+  (with-slots (light-source items)
+      creature
+    (+ (if light-source
+	   (light-source-intensity light-source)
+	   0)
+       (apply #'+ (mapcar #'radiant-intensity items)))))
+
+(defmethod emit-light ((creature creature))
+  (with-slots (light-source level items xy)
+      creature
+    (let ((temp-light (make-light-source :x (car xy)
+					 :y (cdr xy)
+					 :intensity (radiant-intensity creature))))
+      (debug-print 50 "Creature ~a is emitting light.~%" creature)
+      (let ((fov-map (level-acquire-obstacle-map level)))
+	(add-light-from-source temp-light fov-map)
+	(level-release-obstacle-map level fov-map)))))
 
 (defmethod visible-to? ((target creature) (observer creature))
   (or (eq target observer)
@@ -183,13 +193,13 @@
   
 
 (defmethod remove-from-map ((creature creature))
-  (let ((level (creature-level creature)))
+  (let ((level (object-level creature)))
     (debug-print 10 "Removing creature ~a from ~a.~%" creature level)
     (unless (null level)
       (debug-print 10 "Removed creature. Left on map: ~a." (level-creatures level))
       (setf (level-creatures level) (remove creature (level-creatures level))))
-    (setf (creature-level creature) nil)
-    (debug-print 10 "Did remove creature now at ~a.~%" (creature-level creature))
+    (setf (object-level creature) nil)
+    (debug-print 10 "Did remove creature now at ~a.~%" (object-level creature))
     (unless (null (creature-tile creature))
       (setf (tile-creature (creature-tile creature)) nil))))
 

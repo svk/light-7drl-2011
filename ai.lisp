@@ -1,8 +1,10 @@
+(in-package :light-7drl)
+
 (defun ai-random-walk (creature)
   (debug-print 50 "AI random-walk triggers on ~a." (creature-name creature))
   (let ((moves (remove-if-not #'(lambda (dxdy)
 				  (creature-can-walk? creature 
-						      (tile-at (creature-level creature)
+						      (tile-at (object-level creature)
 							       (+ (creature-x creature) (car dxdy))
 							       (+ (creature-y creature) (cdr dxdy)))))
 			      *directions*)))
@@ -60,7 +62,7 @@
 
 (defun follow-stepmap-search (me stepmap depth selector)
   (or (follow-stepmap me stepmap selector)
-      (let* ((level (creature-level me))
+      (let* ((level (object-level me))
 	     (search-map (make-array (array-dimensions (level-tiles level))
 				     :initial-element nil))
 	     (my-x (creature-x me))
@@ -152,7 +154,7 @@
 	       (dist (distance ox oy x y)))
 	  (if (and (> dist best-value)
 		   (creature-can-walk? creature
-				       (tile-at (creature-level creature) x y)))
+				       (tile-at (object-level creature) x y)))
 	      (setf best-step (cons dx dy)
 		    best-value dist)))))
     best-step))
@@ -257,17 +259,17 @@
       creature
     (setf stepmap-to
 	  (or stepmap-to
-	      (let ((arr (make-array (array-dimensions (level-tiles (creature-level creature)))
+	      (let ((arr (make-array (array-dimensions (level-tiles (object-level creature)))
 				     :initial-element nil)))
 		(setf (aref arr (creature-x creature) (creature-y creature))
 		      0)
-		(stabilize-stepmap arr (creature-level creature) 10))))))
+		(stabilize-stepmap arr (object-level creature) 10))))))
 
 (defmethod make-tactical-stepmap-to ((creature creature) (mover creature))
   (with-slots (stepmap-to)
       creature
-    (let ((arr (make-array (array-dimensions (level-tiles (creature-level creature)))
+    (let ((arr (make-array (array-dimensions (level-tiles (object-level creature)))
 			   :initial-element nil)))
       (setf (aref arr (creature-x creature) (creature-y creature))
 	    0)
-      (stabilize-stepmap arr (creature-level creature) 5 #'(lambda (tile) (creature-can-walk? mover tile))))))
+      (stabilize-stepmap arr (object-level creature) 5 #'(lambda (tile) (creature-can-walk? mover tile))))))

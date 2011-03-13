@@ -14,11 +14,6 @@
   (items nil)
   (lighting 0))
 
-(defstruct item
-  appearance
-  name
-  size)
-
 (defstruct level
   width
   height
@@ -34,7 +29,21 @@
   intensity
   (cached-fov nil))
 
-(defclass creature ()
+(defclass radiant ()
+  ((light-source :initform nil
+		 :initarg :light-source)
+   (level  :accessor object-level
+	   :initform nil
+	   :initarg :level)))
+
+
+(defclass item (radiant)
+  ((appearance :accessor item-appearance
+	       :initarg :appearance)
+   (name :accessor item-name
+	 :initarg :name)))
+
+(defclass creature (radiant)
   ((appearance :accessor creature-appearance
 	       :initarg :appearance)
    (name :accessor creature-name
@@ -58,9 +67,6 @@
    (items :accessor creature-items
 	  :initform nil
 	  :initarg :items)
-   (level :accessor creature-level
-	  :initform nil
-	  :initarg :level)
    (stepmap-to :initform nil)
    (fov :accessor creature-fov
 	:initform nil)
@@ -75,8 +81,6 @@
    (speed :initarg :speed
 	  :initform 1)
    (hooks :initform (make-hash-table))
-   (light-source :initform nil
-		 :initarg :light-source)
    (dodge-multiplier :initform 1
 		     :initarg :dodge-multiplier)))
 	  

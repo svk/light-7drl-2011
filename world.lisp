@@ -145,7 +145,7 @@
       (aref map x y))))
 
 (defun try-move-creature (creature dx dy)
-  (let* ((level (creature-level creature))
+  (let* ((level (object-level creature))
 	 (xy (creature-xy creature))
 	 (x (car xy))
 	 (y (cdr xy))
@@ -165,7 +165,7 @@
 	 (y (cdr xy)))
     (debug-print 50 "Spawning creature ~a on ~a.~%" creature xy)
     (set-position creature x y level)
-    (debug-print 50 "Newly spawned creature on ~a.~%" (creature-level creature))
+    (debug-print 50 "Newly spawned creature on ~a.~%" (object-level creature))
     creature))
 
 (defun tick-creatures (list)
@@ -269,6 +269,8 @@
 
 (defun update-world ()
   (clear-lighting)
+  (dolist (item (level-floor-items *game-current-level*))
+    (emit-light item))
   (dolist (creature (level-creatures *game-current-level*))
     (emit-light creature))
   (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
@@ -314,11 +316,12 @@
 (defun creature-pick-up (creature item)
   (let ((tile (creature-tile creature)))
     (setf (tile-items tile) (remove item (tile-items tile)))
+    (picked-up item)
     (creature-give creature item)))
 
 (defun creature-drop (creature item)
   (unless (null (creature-take creature item))
-    (push item (tile-items (creature-tile creature)))
+    (drop-at item (object-level creature) (creature-x creature) (creature-y creature))
     item))
 
 (defun select-n-random (n list)
@@ -389,9 +392,11 @@
 
 (defun try-player-pick-up (item)
   (unless (null (creature-pick-up *game-player* item))
+    (player-took-action)
     (buffer-show "You pick up ~a." (definite-noun (item-name item)))))
 
 (defun try-player-drop (item &optional (confirmed nil))
+  (player-taking-action)
   (cond
     ((and (not confirmed)
 	  (tile-dark (creature-tile *game-player*)))
@@ -400,6 +405,7 @@
 			    (definite-noun (item-name item)))
 		    #'(lambda () (try-player-drop item t))))
     (t (unless (null (creature-drop *game-player* item))
+	 (player-took-action)
 	 (buffer-show "You drop your ~a." (noun-singular (item-name item)))))))
 
 (defun try-player-drop-stack ()
@@ -514,7 +520,9 @@
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
 							   :foreground-colour '(0 0 0))
 			      :name n-sword
-			      :size 1))
+			      :light-source (make-light-source :x nil
+							       :y nil
+							       :intensity 0.9)))
     (debug-print 50 "Printing welcome messages.~%")
     (buffer-show "Welcome to Light7DRL!")
     (buffer-show "How pitiful ~a tale!" (player-possessive))
@@ -534,15 +542,25 @@
   (creature-give *game-player*
 		 (make-item :appearance (make-appearance :glyph +weapon-glyph+
 							 :foreground-colour '(0 0 0))
-			    :name n-goose
-			    :size 1)))
+			    :name n-goose)))
 
 (defun cheat-spawn-doodad ()
   (creature-give *game-player*
 		 (make-item :appearance (make-appearance :glyph +weapon-glyph+
 							 :foreground-colour '(0 0 0))
-			    :name n-child
-			    :size 1)))
+			    :name n-child)))
+
+(defmethod emit-light ((radiant radiant))
+  (with-slots (light-source level)
+      radiant
+    (unless (or (null light-source)
+		(null level))
+      (debug-print 50 "Radiant ~a is emitting light.~%" radiant)
+      (let ((fov-map (level-acquire-obstacle-map level)))
+	(add-light-from-source light-source fov-map)
+	(level-release-obstacle-map level fov-map)))))
+
+
 
 
 
