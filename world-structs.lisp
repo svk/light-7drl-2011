@@ -80,9 +80,19 @@
    (attack-verb :initarg :attack-verb)
    (hit-verb :initarg :hit-verb)
    (miss-verb :initarg :miss-verb)
+   (attack-inflicts-status :initarg :attack-inflicts-status
+			   :initform nil)
    (speed :initarg :speed
 	  :initform 1)
    (hooks :initform (make-hash-table))
    (dodge-multiplier :initform 1
-		     :initarg :dodge-multiplier)))
-	  
+		     :initarg :dodge-multiplier)
+   (statuses :initform nil)))
+
+(defstruct status-attack
+  type
+  verb)
+
+(defstruct affliction
+  type)
+  

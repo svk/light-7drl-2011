@@ -4,6 +4,8 @@
 (defnoun n-rat "a" "rat" "rats")
 (defnoun n-snake "a" "viper" "vipers")
 
+(defverb-23p v-is-poisoned "are poisoned" "is poisoned")
+
 (defun make-snake ()
   (let ((rv (make-creature
 	     :appearance (make-appearance :glyph (char-code #\~)
@@ -12,8 +14,10 @@
 	     :gender nil
 	     :hit-chance (make-chance-roll :success-chance 3/4)
 	     :damage (make-dice-roll :number-of-dice 1
-				     :dice-size 4)
+				     :dice-size 0)
 	     :dodge-multiplier 1/2
+	     :attack-inflicts-status (make-status-attack :type :poison
+							 :verb v-is-poisoned)
 	     :max-hp 5)))
     (install-stateai rv
 		     #'stateai-harmless-until-approached

@@ -181,6 +181,8 @@
       (let ((statuses nil))
 	(unless (not (tile-dark (creature-tile *game-player*)))
 	  (push "Darkness " statuses))
+	(unless (not (get-status *game-player* :poison))
+	  (push "Poisoned " statuses))
 	(apply #'concatenate (cons 'string statuses)))))
     
 	  

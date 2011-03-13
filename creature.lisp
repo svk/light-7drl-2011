@@ -1,6 +1,6 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil) (dodge-multiplier 1))
+(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil) (dodge-multiplier 1) (attack-inflicts-status nil))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
@@ -15,6 +15,7 @@
 		 :miss-verb miss-verb
 		 :hit-verb hit-verb
 		 :speed speed
+		 :attack-inflicts-status attack-inflicts-status
 		 :dodge-multiplier dodge-multiplier
 		 :light-source (if light-intensity
 				   (make-light-source
@@ -22,11 +23,19 @@
 				    :y nil
 				    :intensity light-intensity))))
 
+(defmethod get-status ((creature creature) type)
+  (with-slots (statuses)
+      creature
+    (find type statuses :key #'identity)))
+
 (defmethod tick ((creature creature))
   (with-slots (speed ai)
       creature
-    (dotimes (i speed)
-      (funcall ai creature))))
+    (unless (null ai)
+      (dotimes (i speed)
+	(funcall ai creature))))
+  (unless (not (get-status creature :poison))
+    (damage creature 1)))
 
 (defmethod set-position ((creature creature) x y level)
   (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (object-level creature) x y level)
@@ -138,7 +147,7 @@
       (setf (gethash hook-name hooks) (cons f current-hooks)))))
   
 (defmethod melee-attack ((target creature) (attacker creature))
-  (with-slots (base-hit-chance base-damage attack-verb hit-verb miss-verb)
+  (with-slots (base-hit-chance base-damage attack-verb hit-verb miss-verb attack-inflicts-status)
       attacker
     (let ((hit-chance (with-slots (dodge-multiplier)
 			  target
@@ -160,12 +169,30 @@
 						 miss-verb)))
 	    (t
 	     (let ((damage (roll-result? dice-roll)))
-	       (buffer-show-cap "~a ~a for ~a damage!"
-				(dnoun-verbs (third-person attacker) hit-verb)
-				(definite-noun t-noun)
-				damage)
+	       (if (> damage 0)
+		   (buffer-show-cap "~a ~a for ~a damage!"
+				    (dnoun-verbs (third-person attacker) hit-verb)
+				    (definite-noun t-noun)
+				    damage)
+		   (buffer-show-cap "~a ~a!"
+				    (dnoun-verbs (third-person attacker) hit-verb)
+				    (definite-noun t-noun)
+				    damage))
+	       (unless (null attack-inflicts-status)
+		 (inflict-status target attack-inflicts-status))
 	       (damage target damage))))
       (run-hooks target :after-attacked attacker))))
+
+(defmethod inflict-status ((creature creature) status-attack)
+  (with-slots (statuses)
+      creature
+    (unless (find (status-attack-type status-attack) statuses)
+      (push (status-attack-type status-attack) statuses)
+      (emit-visual creature
+		   (format nil
+			   "~a!"
+			   (dnoun-verbs (creature-name creature)
+					(status-attack-verb status-attack)))))))
 
 (defmethod third-person ((creature creature))
   (with-slots (gender)
@@ -178,6 +205,12 @@
   v-die)
 
 (defmethod die ((creature creature))
+  (dolist (item (creature-items creature))
+    (drop-at item
+	     (object-level creature)
+	     (creature-x creature)
+	     (creature-y creature)))
+  (setf (creature-items creature) nil)
   (run-hooks creature :before-death)
   (remove-from-map creature)
   (unless (not (visible-to? creature *game-player*))

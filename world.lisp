@@ -170,8 +170,7 @@
 
 (defun tick-creatures (list)
   (dolist (creature list)
-    (unless (null (creature-ai creature))
-      (tick creature))))
+    (tick creature)))
 
 (defun make-wall-tile ()
   (make-tile :appearance (make-appearance :glyph +wall-glyph+
