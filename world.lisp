@@ -88,6 +88,8 @@
   (make-dice-roll :number-of-dice 2 :dice-size 1))
  *level-generation-info*)
 
+(setf *level-generation-info* (reverse *level-generation-info*)) ;; duh
+
 (defun level-set-obstacle-map (level omap)
   (with-slots (obstacle-map)
       level
@@ -362,6 +364,7 @@
   (populate-level-creatures level creature-constructors)
   (populate-level-items level item-constructors)
   (populate-level-braziers level brazier-amount)
+  (spawn-item (make-strength-potion) level)
   level)
 
 (defun create-level-generated (width height)
@@ -803,6 +806,9 @@
 				(cadr xy)))
 		      (drunken-walks 30 30))))
     (debug-print 50 "drunkenwalked ~a~%" digs)
+    (dolist (creature (level-creatures *game-current-level*))
+      (unless (not (eq (creature-name creature) n-shadow))
+	(die creature)))
     (dolist (xy digs)
       (let ((x (car xy))
 	    (y (cdr xy))
@@ -879,7 +885,7 @@
 			  :damage (second *fist-power*)
 			  :max-hp 100)
 			 *game-current-level*))
-    (install-hook *game-player* :after-death
+    (install-hook *game-player* :before-death
 		  #'(lambda ()
 		      (debug-print 1 "Triggering player death hook.~%")
 		      (signal 'game-over
@@ -891,6 +897,12 @@
 		   (make-tinderbox))
     (debug-print 50 "Printing welcome messages.~%")
     (buffer-show "You have fallen into a hole in the ground!")
+    (buffer-show "You have fallen into a hole in the grfound!")
+    (buffer-show "You have fallen into a hole in the gsrgound!")
+    (buffer-show "You have fallen into a hole in the grouznd!")
+    (buffer-show "You have fallen into a hole in the xgrouxnd!")
+    (buffer-show "You have fallen into a hole in the grounhd!")
+    (buffer-show "You have fallen into a hole in the groundj!")
     (buffer-show "Only a little piece of sky shows through a small crack in the ceiling far above you.")
     (buffer-show "You will need to explore these strange caves to find another way out...")
     (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)

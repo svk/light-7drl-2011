@@ -58,6 +58,11 @@
 		   (buffer-show "You set the brazier aflame.")
 		   (toggle active)
 		   (player-took-action))))))
+      (:strength-potion
+       (buffer-show "You drink ~a. You feel more powerful." (definite-noun name))
+       (incf (creature-max-hp *game-player*) 25)
+       (consume-item *game-player* item)
+       (player-took-action))
       (:healing-potion
        (if (= (creature-hp *game-player*)
 	      (creature-max-hp *game-player*))

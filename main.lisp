@@ -292,6 +292,7 @@
 			    nil ;; not a fullscreen game
 			    :renderer-sdl)
     (tcod:console-set-keyboard-repeat 500 10)
+    (reset-querying-for-more)
     (setf *game-input-hooks-stack* nil)
     (push-hooks (make-standard-input-hooks))
     (unless *game-initialized*

@@ -10,6 +10,7 @@
 (defnoun n-torch "a" "torch" "torches")
 
 (defnoun n-healing-potion "a" "red potion" "red potions")
+(defnoun n-strength-potion "a" "green potion" "green potions")
 (defnoun n-antidote-potion "a" "blue potion" "blue potions")
 
 (defnoun n-blanket "a" "fireproof blanket" "fireproof blankets")
@@ -73,6 +74,13 @@
 					  :foreground-colour '(255 0 0))
 	     :type :healing-potion
 	     :name n-healing-potion))
+
+(defun make-strength-potion ()
+  (make-item :appearance (make-appearance :glyph (char-code #\&)
+					  :foreground-colour '(0 255 0))
+	     :type :strength-potion
+	     :name n-strength-potion))
+
 
 (defun make-antidote-potion ()
   (make-item :appearance (make-appearance :glyph (char-code #\&)

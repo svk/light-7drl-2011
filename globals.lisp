@@ -164,6 +164,8 @@
 
 
 (let ((querying-for-more nil))
+  (defun reset-querying-for-more ()
+    (setf querying-for-more nil))
   (defun query-space-or-enter (f)
     (debug-print 50 "more: ~a~%" querying-for-more)
     (unless querying-for-more
