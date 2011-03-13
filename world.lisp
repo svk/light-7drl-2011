@@ -16,6 +16,78 @@
   (make-dice-roll :number-of-dice 2 :dice-size 2))
  *level-generation-info*)
 
+(push
+ (list
+  (list
+   (list #'make-rat (make-dice-roll :number-of-dice 1
+				    :dice-size 2))
+   (list #'make-glowbug (make-dice-roll :number-of-dice 1
+					    :dice-size 1))
+   (list #'make-bat (make-dice-roll :number-of-dice 3
+				    :dice-size 2))
+   (list #'make-snake (make-dice-roll :number-of-dice 1
+				      :dice-size 2)))
+
+  (list #'make-torch
+	#'make-torch
+	#'make-knife
+	#'make-tinderbox
+	#'make-blanket
+	#'make-healing-potion
+	#'make-healing-potion
+	#'make-antidote-potion )
+
+  (make-dice-roll :number-of-dice 2 :dice-size 2))
+ *level-generation-info*)
+
+(push
+ (list
+  (list
+   (list #'make-bat (make-dice-roll :number-of-dice 3
+				    :dice-size 2))
+   (list #'make-cave-wolf (make-dice-roll :number-of-dice 1
+					  :dice-size 2))
+   (list #'make-snake (make-dice-roll :number-of-dice 1
+				      :dice-size 2)))
+
+  (list #'make-torch
+	#'make-torch
+	#'make-torch
+	#'make-knife
+	#'make-sword-of-light
+	#'make-tinderbox
+	#'make-blanket
+	#'make-healing-potion
+	#'make-healing-potion
+	#'make-healing-potion
+	#'make-antidote-potion )
+
+  (make-dice-roll :number-of-dice 2 :dice-size 2))
+ *level-generation-info*)
+
+(push
+ (list
+  (list
+   (list #'make-cave-wolf (make-dice-roll :number-of-dice 1
+					  :dice-size 2))
+   (list #'make-shadow (make-dice-roll :number-of-dice 1
+				      :dice-size 1)))
+
+  (list #'make-torch
+	#'make-torch
+	#'make-torch
+	#'make-knife
+	#'make-sword-of-light
+	#'make-tinderbox
+	#'make-blanket
+	#'make-healing-potion
+	#'make-healing-potion
+	#'make-healing-potion
+	#'make-antidote-potion )
+
+  (make-dice-roll :number-of-dice 2 :dice-size 1))
+ *level-generation-info*)
+
 (defun level-set-obstacle-map (level omap)
   (with-slots (obstacle-map)
       level

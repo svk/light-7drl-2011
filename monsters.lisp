@@ -8,6 +8,9 @@
 (defnoun n-shadow "a" "shadow" "shadows")
 (defnoun n-shadow-lord "a" "shadow lord" "shadow lords")
 
+(defnoun n-cave-wolf "a" "cave wolf" "cave wolves")
+
+
 (defverb-23p v-is-poisoned "are poisoned" "is poisoned")
 
 
@@ -124,6 +127,26 @@
 		     :enrage-message nil
 		     :calm-message nil
 		     :radius 4)
+    rv))
+
+(defun make-cave-wolf ()
+  (let ((rv (make-creature
+	     :appearance (make-appearance :glyph (char-code #\W)
+					  :foreground-colour '(200 25 25))
+	     :name n-cave-wolf
+	     :gender nil
+	     :hit-chance (make-chance-roll :success-chance 3/4)
+	     :damage (make-dice-roll :number-of-dice 2
+				     :dice-size 6)
+	     :dodge-multiplier 1
+	     :max-hp 15)))
+    (install-stateai rv
+		     #'stateai-harmless-until-approached
+		     10
+		     :cooldown-while-visible t
+		     :enrage-message nil
+		     :calm-message nil
+		     :radius 15)
     rv))
 
 (defun make-glowbug ()
