@@ -238,6 +238,17 @@
 				      (make-floor-tile)))))
     level))
 
+(defun postprocess-level (level)
+  (level-set-all-unexplored level)
+  (level-add-delayed-spawn level
+			   50
+			   #'(lambda (choices) (mutate-random-tile
+						level
+						choices
+						#'place-lever
+						:eligible #'not-special?)))
+  level)
+
 (defun create-level-generated (width height)
   (let ((level (create-level width height))
 	(sketch (generate-cave (- width 2) (- height 2))))
@@ -266,12 +277,37 @@
 (defun find-random-walkable (map)
   (select-random (find-walkables map)))
 
+(defun fov->fov-xys (fov)
+  (let ((rv nil))
+    (dotimes (x +map-width+)
+      (dotimes (y +map-height+)
+	(unless (not (aref fov x y))
+	  (push (cons x y) rv))))
+    rv))
+
 (defun update-world ()
   (clear-lighting)
   (dolist (item (level-floor-items *game-current-level*))
     (emit-light item))
   (dolist (creature (level-creatures *game-current-level*))
     (emit-light creature))
+  (unless (not *game-player*)
+    (let* ((newly-explored (level-explore *game-current-level*
+					  (fov->fov-xys (get-fov *game-player*))))
+	   (left-unexplored (length (level-unexplored *game-current-level*))))
+      (debug-print 50
+		   "Newly explored tiles: ~a Unexplored tiles: ~a dspawns ~a~%"
+		   (length newly-explored)
+		   left-unexplored
+		   (level-delayed-spawns *game-current-level*))
+      (dolist (delayed-spawn (level-delayed-spawns *game-current-level*))
+	(unless (<= (car delayed-spawn) left-unexplored)
+	  (or (funcall (cadr delayed-spawn) (append newly-explored
+						    (level-unexplored *game-current-level*)))
+	      (funcall (cadr delayed-spawn) (find-walkables *game-current-level*)))
+	  (setf (level-delayed-spawns *game-current-level*)
+		(remove delayed-spawn
+			(level-delayed-spawns *game-current-level*)))))))
   (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
     (debug-print 10 "omap comin': ~a~%" fov-map)
     (add-light-from-source *game-torch* fov-map)
@@ -442,8 +478,9 @@
 		 ((and (not (tile-dark old-tile))
 		       (tile-dark new-tile))
 		  (buffer-show "You stumble into the darkness.")))
-	   (unless (null (tile-items new-tile))
-	     (buffer-show (summarize-floor-items (tile-items new-tile))))
+	   (let ((summary (summarize-tile new-tile)))
+	     (unless (zerop (length summary))
+	       (buffer-show summary)))
 	   (player-took-action)))))))
 
 (defun summarize-floor-items (items)
@@ -456,6 +493,28 @@
     (if (null stringlist)
 	(format nil "There's nothing here.")
 	(format nil "There ~a ~a here." (is-are total) (list-join stringlist)))))
+
+(defun summarize-tile (tile)
+  (let* ((items (tile-items tile))
+	 (countlist (make-count-list (mapcar #'item-name items)))
+	 (total (reduce #'+ (mapcar #'cdr countlist))))
+    (if (tile-special tile)
+	(progn
+	  (incf total)
+	  (push (case (tile-special tile)
+		  (:lever (cons n-lever 1))
+		  (:hole (cons n-hole 1)))
+		countlist)))
+    (let ((stringlist (mapcar #'(lambda (noun-count)
+				  (indefinite-counted-noun (car noun-count)
+							   (cdr noun-count)))
+			      countlist)))
+      (if (null stringlist)
+	  (format nil "There's nothing here.")
+	  (capitalize (format nil
+			      "There ~a ~a here." 
+			      (is-are (cdar countlist))
+			      (list-join stringlist)))))))
   
 (defun initialize-first-game ()
   (query-string
@@ -484,7 +543,8 @@
     (debug-print 50 "INITIALIZING GAME HELLO")
     (push-hooks #'ignore-input)
     (push-special-screen (make-centered-text-special-screen "Please wait..."))
-    (setf *game-current-level* (create-level-generated map-width map-height))
+    (setf *game-current-level*
+	  (postprocess-level (create-level-generated map-width map-height)))
     (setf *game-player* (spawn-creature 
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+

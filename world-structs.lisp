@@ -12,7 +12,9 @@
   (visible nil)
   (creature nil)
   (items nil)
-  (lighting 0))
+  (lighting 0)
+  (explored nil)
+  (special nil))
 
 (defstruct level
   width
@@ -21,7 +23,9 @@
   (creatures nil)
   (floor-items nil)
   (obstacle-map nil)
-  (obstacle-map-updated nil))
+  (obstacle-map-updated nil)
+  (unexplored nil)
+  (delayed-spawns nil))
 
 (defstruct light-source
   x
@@ -92,7 +96,4 @@
 (defstruct status-attack
   type
   verb)
-
-(defstruct affliction
-  type)
   

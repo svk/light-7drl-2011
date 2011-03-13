@@ -86,7 +86,8 @@
 (defnoun n-monster "a" "monster" "monsters")
 (defnoun-uncountable n-tea "tea")
 
-(defnoun n-glowbug "a" "glow-bug" "glow-bugs")
+(defnoun n-lever "a" "stone lever" "stone levers")
+(defnoun n-hole "a" "hole in the dungeon floor" "holes in the dungeon floor")
 
 (defnoun-uncountable n-he "he" nil)
 (defnoun-uncountable n-she "she" nil)
@@ -204,6 +205,16 @@
 	(1)
 	(2 (format out " and "))
 	(t (format out ", "))))))
+
+(defun spaced-string-join (strings)
+  (with-output-to-string (out)
+    (do ((count (length strings) (- count 1))
+	 (more-strings strings (cdr more-strings)))
+	((zerop count))
+      (format out "~a" (car more-strings))
+      (case count
+	(1)
+	(t (format out " "))))))
 
 (defun capitalize (string)
   (format nil "~a~a" (char-upcase (aref string 0)) (subseq string 1)))

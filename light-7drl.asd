@@ -23,6 +23,8 @@
 			:depends-on ("package" "ai" "rolls" "creature"))
 		 (:file "items"
 			:depends-on ("package" "item" "rolls" "grammar"))
+		 (:file "level"
+			:depends-on ("package" "items" "monsters" "dungeon" "world-structs"))
 		 (:file "world"
 			:depends-on ("monsters" "items" "item" "visuals" "ai" "rolls" "world-structs" "grammar" "creature" "package" "globals"))
 		 (:file "main"
