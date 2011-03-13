@@ -97,8 +97,10 @@
 					      :y nil
 					      :intensity +torch-max-intensity+)))
 
-(defun make-brazier (&key (status nil))
-  (make-item :appearance (make-appearance :glyph (char-code #\#)
+(defun make-brazier (&key (status nil) (invisible nil))
+  (make-item :appearance (make-appearance :glyph (if invisible
+						     (char-code #\ )
+						     (char-code #\#))
 					  :foreground-colour '(255 0 0))
 	     :type :brazier
 	     :name n-brazier
@@ -110,3 +112,21 @@
 	     :light-source (make-light-source :x nil
 					      :y nil
 					      :intensity +brazier-intensity+)))
+
+(defparameter *default-item-constructors*
+  (list
+   #'make-torch
+   #'make-torch
+   #'make-torch
+
+   #'make-healing-potion 
+   #'make-healing-potion
+   #'make-healing-potion
+
+   #'make-antidote-potion
+   #'make-antidote-potion
+   #'make-antidote-potion
+
+   #'make-knife
+   #'make-blanket
+   #'make-tinderbox))

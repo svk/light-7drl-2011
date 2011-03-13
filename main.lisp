@@ -264,19 +264,18 @@
 	(if movement-xy
 	    (move-command (car movement-xy) (cdr movement-xy))
 	    (case value
-	      (#\E (die *game-player*))
-	      (#\W (signal 'game-over :type :victory))
 	      (#\. (player-wait))
 	      (#\a (try-use-special))
 	      (#\d (try-player-drop-query))
 	      (#\x (try-player-apply-query))
 	      (#\, (try-player-pick-up-stack))
-	      (#\V (toggle *cheat-lightall*))
-	      (#\T (toggle *ai-test-fleeing*))
 	      (#\: (enter-look-mode (object-level *game-player*) (player-x) (player-y)))
-	      (#\X (spawn-item-for *game-player* #'make-torch))
-	      (#\C (spawn-item-for *game-player* #'make-blanket))
 	      (#\Q (query-confirm "Really quit?" #'quit-game))
+
+	      (#\W (go-to-next-level))
+	      (#\A (show-game-ending))
+	      (#\V (toggle *cheat-lightall*))
+
 	      (t (handle-input value stack)))))))
 
 (defun start-game ()

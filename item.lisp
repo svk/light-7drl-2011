@@ -26,7 +26,7 @@
       (:melee-weapon
        (setf (creature-weapon *game-player*)
 	     item)
-       (buffer-show "You wield ~a.~%" (definite-noun name))
+       (buffer-show "You wield ~a." (definite-noun name))
        (player-took-action))
       (:torch
        (if active

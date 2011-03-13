@@ -1,5 +1,21 @@
 (in-package #:light-7drl)
 
+(defparameter *level-generation-info* nil)
+
+(push
+ (list
+  (list
+   (list #'make-rat (make-dice-roll :number-of-dice 1
+				    :dice-size 1))
+   (list #'make-glowbug (make-dice-roll :number-of-dice 1
+					    :dice-size 1)))
+  (list #'make-torch
+	#'make-healing-potion
+	#'make-antidote-potion )
+
+  (make-dice-roll :number-of-dice 2 :dice-size 2))
+ *level-generation-info*)
+
 (defun level-set-obstacle-map (level omap)
   (with-slots (obstacle-map)
       level
@@ -167,6 +183,14 @@
     (debug-print 50 "Newly spawned creature on ~a.~%" (object-level creature))
     creature))
 
+(defun spawn-item (item level)
+  (let* ((xy (select-random 
+	      (find-walkables level)))
+	 (x (car xy))
+	 (y (cdr xy)))
+    (drop-at item level x y)
+    item))
+
 (defun tick-creatures (list)
   (dolist (creature list)
     (tick creature)))
@@ -237,7 +261,24 @@
 				      (make-floor-tile)))))
     level))
 
-(defun postprocess-level (level)
+(defun populate-level-creatures (level creature-constructors)
+  (dotimes (i (roll-result? *creature-packages-per-level*))
+    (let ((c-pack (select-random creature-constructors)))
+      (let ((pack-size (roll-result? (second c-pack))))
+	(dotimes (j pack-size)
+	  (spawn-creature (funcall (first c-pack)) level))))))
+
+(defun populate-level-items (level item-constructors)
+  (dotimes (i (roll-result? *creature-packages-per-level*))
+    (let ((i-pack (select-random item-constructors)))
+      (spawn-item (funcall i-pack) level))))
+
+(defun populate-level-braziers (level brazier-amount)
+  (spawn-item (make-brazier :status :lit) level)
+  (dotimes (i (roll-result? brazier-amount))
+    (spawn-item (make-brazier) level)))
+
+(defun postprocess-level (level creature-constructors item-constructors brazier-amount)
   (level-set-all-unexplored level)
   (level-add-delayed-spawn level
 			   50
@@ -246,6 +287,9 @@
 						choices
 						#'place-lever
 						:eligible #'not-special?)))
+  (populate-level-creatures level creature-constructors)
+  (populate-level-items level item-constructors)
+  (populate-level-braziers level brazier-amount)
   level)
 
 (defun create-level-generated (width height)
@@ -291,6 +335,11 @@
     (emit-light item))
   (dolist (creature (level-creatures *game-current-level*))
     (emit-light creature))
+  (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
+    (dolist (source (level-invisible-light-sources *game-current-level*))
+      (add-light-from-source source fov-map))
+    (level-release-obstacle-map *game-current-level* fov-map))
+    
   (unless (not *game-player*)
     (let* ((newly-explored (level-explore *game-current-level*
 					  (fov->fov-xys (get-fov *game-player*))))
@@ -307,11 +356,7 @@
 	      (funcall (cadr delayed-spawn) (find-walkables *game-current-level*)))
 	  (setf (level-delayed-spawns *game-current-level*)
 		(remove delayed-spawn
-			(level-delayed-spawns *game-current-level*)))))))
-  (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
-    (debug-print 10 "omap comin': ~a~%" fov-map)
-    (add-light-from-source *game-torch* fov-map)
-    (level-release-obstacle-map *game-current-level* fov-map)))
+			(level-delayed-spawns *game-current-level*))))))))
   
 
 (defun tick-world ()
@@ -550,7 +595,6 @@
 	     (go-to-next-level t)
 	     (progn
 	       (unless (not new-tile)
-		 (move-light-source *game-torch* (player-x) (player-y))
 		 (cond ((and (tile-dark old-tile)
 			     (not (tile-dark new-tile)))
 			(buffer-show "Your eyes blink as you adjust to the light."))
@@ -560,7 +604,9 @@
 		 (let ((summary (summarize-tile new-tile :local t)))
 		   (unless (zerop (length summary))
 		     (buffer-show summary))))
-		 (player-took-action))))))))
+	       (if (zerop (creature-y *game-player*))
+		   (signal 'game-over :type :victory))
+	       (player-took-action))))))))
 
 (defun summarize-floor-items (items)
   (let* ((countlist (make-count-list (mapcar #'item-name items)))
@@ -674,7 +720,31 @@
   (invalidate-stepmap-to-darkness)
   (unless (not involuntary)
     (buffer-show "You fall into a hole!"))
-  (signal 'game-over :type :victory))
+  (setf *game-current-level* (generate-finished-level))
+  (remove-from-map *game-player*)
+  (spawn-creature *game-player* *game-current-level*)
+  (update-world))
+
+(defun show-game-ending ()
+  (let ((digs (mapcar #'(lambda (xy)
+			  (cons (+ (truncate (/ +map-width+ 2)) (car xy))
+				(cadr xy)))
+		      (drunken-walks 30 30))))
+    (debug-print 50 "drunkenwalked ~a~%" digs)
+    (dolist (xy digs)
+      (let ((x (car xy))
+	    (y (cdr xy))
+	    (tiles (level-tiles *game-current-level*)))
+	(unless (not (array-in-bounds-p tiles x y))
+	  (unless (tile-walkable (tile-at *game-current-level* x y))
+	    (setf (aref tiles x y) (make-floor-tile)))
+	  (push (make-light-source :x x
+				   :y y
+				   :intensity +brazier-intensity+)
+		(level-invisible-light-sources *game-current-level*))))))
+  (buffer-show "The cave walls collapse!")
+  (buffer-show "Sunlight fills the cave..."))
+
 
 (defun try-use-special ()
   (player-taking-action)
@@ -685,6 +755,13 @@
 			  #'(lambda ()
 			      (go-to-next-level))))))
 
+(defun generate-finished-level ()
+  (postprocess-level
+   (create-level-generated +map-width+ +map-height+)
+   *default-monster-constructors*
+   *default-item-constructors*
+   (make-dice-roll :number-of-dice 2 :dice-size 3)))
+
 (defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
 	(map-height (- +screen-height+ +ui-top-lines+ +ui-bottom-lines+)))
@@ -692,7 +769,7 @@
     (push-hooks #'ignore-input)
     (push-special-screen (make-centered-text-special-screen "Please wait..."))
     (setf *game-current-level*
-	  (postprocess-level (create-level-generated map-width map-height)))
+	  (generate-finished-level))
     (setf *game-player* (spawn-creature 
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
@@ -709,32 +786,14 @@
 		      (signal 'game-over
 			      :type :death)))
     (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
-    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
-      (let ((ls (pop light-sources)))
-	(drop-at (make-brazier :status :lit)
-		 *game-current-level*
-		 (light-source-x ls)
-		 (light-source-y ls)))
-      (dolist (ls light-sources)
-	(drop-at (make-brazier)
-		 *game-current-level*
-		 (light-source-x ls)
-		 (light-source-y ls)))
-      (debug-print 50 "Generated light sources: ~a.~%" light-sources))
-    (setf *game-torch* (make-light-source
-			:x (player-x)
-			:y (player-y)
-			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
-    (debug-print 50 "what the fuck should spawn creature")
-    (dotimes (i 5)
-	(spawn-creature (make-bat) *game-current-level*))
-    (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-knife))
+    (creature-give *game-player*
+		   (make-tinderbox))
     (debug-print 50 "Printing welcome messages.~%")
-    (buffer-show "Welcome to Light7DRL!")
-    (buffer-show "How pitiful ~a tale!" (player-possessive))
-    (buffer-show "How rare ~a beauty!" (player-possessive))
+    (buffer-show "You have fallen into a hole in the ground!")
+    (buffer-show "Only a little piece of sky shows through a small crack in the ceiling far above you.")
+    (buffer-show "You will need to explore these strange caves to find another way out...")
     (debug-print 100 "Buffer is now: ~a.~%" *game-text-buffer*)
     (update-world)
     (pop-hooks)

@@ -8,6 +8,12 @@
   dice-size
   (constant 0))
 
+(defparameter *items-per-level* (make-dice-roll :number-of-dice 1
+					       :dice-size 4))
+(defparameter *creature-packages-per-level* (make-dice-roll :number-of-dice 1
+							    :dice-size 4
+							    :constant 4))
+
 (defmethod print-object ((roll chance-roll) stream)
   (with-slots (success-chance)
       roll

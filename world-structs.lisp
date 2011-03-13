@@ -20,6 +20,9 @@
   width
   height
   tiles
+  creature-constructors
+  item-constructors
+  (invisible-light-sources nil)
   (creatures nil)
   (floor-items nil)
   (obstacle-map nil)
@@ -83,6 +86,10 @@
    (xy :accessor creature-xy
        :initform nil
        :initarg :xy)
+   (light-vulnerable :initform nil
+		     :initarg :light-vulnerable)
+   (darkness-regenerating :initform nil
+		     :initarg :darkness-regenerating)
    (items :accessor creature-items
 	  :initform nil
 	  :initarg :items)

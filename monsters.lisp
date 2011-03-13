@@ -5,7 +5,48 @@
 (defnoun n-snake "a" "viper" "vipers")
 (defnoun n-bat "a" "bat" "bats")
 
+(defnoun n-shadow "a" "shadow" "shadows")
+(defnoun n-shadow-lord "a" "shadow lord" "shadow lords")
+
 (defverb-23p v-is-poisoned "are poisoned" "is poisoned")
+
+
+(defun make-shadow ()
+  (let ((rv (make-creature
+	     :appearance (make-appearance :glyph (char-code #\s)
+					  :foreground-colour '(0 0 0))
+	     :name n-shadow
+	     :gender nil
+	     :darkvision t
+	     :hit-chance (make-chance-roll :success-chance 1)
+	     :damage (make-dice-roll :number-of-dice 2
+				     :dice-size 6)
+	     :dodge-multiplier 1
+	     :max-hp 20
+	     :light-vulnerable t
+	     :darkness-regenerating t
+	     :ai #'ai-search-player-and-destroy)))
+    rv))
+
+(defun make-shadow-lord ()
+  (let ((rv (make-creature
+	     :appearance (make-appearance :glyph (char-code #\S)
+					  :foreground-colour '(0 0 0))
+	     :name n-shadow-lord
+	     :darkvision t
+	     :hit-chance (make-chance-roll :success-chance 1)
+	     :damage (make-dice-roll :number-of-dice 4
+				     :dice-size 6)
+	     :dodge-multiplier 0
+	     :max-hp 100
+	     :darkness-regenerating t
+	     :light-vulnerable t)))
+    (install-hook rv
+		  :before-death
+		  #'show-game-ending)
+    (install-stateai rv
+		     #'ai-boss-shadowlord)
+    rv))
 
 (defun make-bat ()
   (let ((rv (make-creature
@@ -105,3 +146,17 @@
 		     :enrage-message nil
 		     :calm-message nil)
     rv))
+
+
+(defparameter *default-monster-constructors*
+  (list
+   (list #'make-bat (make-dice-roll :number-of-dice 1
+			       :dice-size 4))
+   (list #'make-snake (make-dice-roll :number-of-dice 1
+				 :dice-size 2))
+   (list #'make-rat (make-dice-roll :number-of-dice 1
+			       :dice-size 3))
+   (list #'make-glowbug (make-dice-roll :number-of-dice 1
+			       :dice-size 1))))
+   
+
