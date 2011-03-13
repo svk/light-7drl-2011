@@ -1,0 +1,56 @@
+Forgetting the way DO works:
+    (defun print-tail (i)
+        (do ((i (cdr i)))
+            ((null i))
+            (format t "~a~%" (car i))))
+is an infinite loop -- i is initialized to (cdr i) and then left alone.
+(cdr i) must be repeated to get the desired effect.
+
+=
+
+Forgetting to add a return value:
+    (defun sum (xs)
+        (let ((rv 0))
+            (dolist (x xs)
+                (setf rv (+ rv x)))))
+always returns NIL -- must add rv as an expression by itself at the end.
+
+=
+
+Something subtle with slots, which I haven't quite figured out yet:
+sometimes, if you're accessing a slot "level" with (with-slots (level)
+creature ...), getting the same value with (creature-level creature)
+seems to fail. See 541fabe645f70d5d2e9d2d2ee9edb876a27dc6f9.
+[note: this was probably a case of a slot "level" shadowing a
+parameter with the same name -- check later]
+
+=
+
+Various bugs going undetected because parts of the old code are still
+left in memory in the testing session. For instance: change the name
+of a function, and forget to change some of the calls -- the old
+version of the function remains defined, and changes to the new one
+will be ignored.
+
+=
+
+There are two obvious ways to represent two-dimensional coordinates:
+(list x y) and (cons x y). The latter saves one cons and the former
+is sometimes easier to write and is extensible to more dimensions.
+Obviously, mixing them up is trouble.
+
+=
+
+Swapping the order of the arguments of PUSH, since it tends to accept
+(push list item) without complaint. (push item list) is correct.
+
+=
+
+IFs with no else clause are error-prone as it may look natural (even
+with respect to conventional formatting) to expand them by one form
+(really adding an else clause instead of adding to the then-clause).
+This is much the same problem as IFs without {} in other languages
+(except that my unfamiliarity with the language makes it result
+in actual bugs rather than just nuisances when then-clauses are to
+be expanded). Workaround is using (unless (not ...)) for everything,
+but this is slightly unclear.
