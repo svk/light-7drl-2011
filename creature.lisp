@@ -147,13 +147,15 @@
   (with-slots (hooks)
       creature
     (dolist (f (gethash hook-name hooks nil))
+      (debug-print 50 "Running hook on ~a ~a: ~a~%" creature hook-name f)
       (apply f rest))))
 
 (defmethod install-hook ((creature creature) hook-name f)
   (with-slots (hooks)
       creature
     (let ((current-hooks (gethash hook-name hooks nil)))
-      (setf (gethash hook-name hooks) (cons f current-hooks)))))
+      (setf (gethash hook-name hooks) (cons f current-hooks))
+      (debug-print 50 "Hooks now installed on ~a ~a: ~a~%" creature hook-name (gethash hook-name hooks)))))
 
 (defmethod get-base-hit-chance ((creature creature))
   (with-slots (items weapon base-hit-chance)

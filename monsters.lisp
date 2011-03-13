@@ -22,13 +22,24 @@
     (install-hook rv
 		  :bat-signal
 		  #'(lambda ()
+		      (debug-print 50 "Received bat signal.~%")
 		      (run-hooks rv :provoke)))
+    (install-hook rv
+		  :after-attacked
+		  #'(lambda (attacker)
+		      (declare (ignore attacker))
+		      (debug-print 50 "Being attacked!.~%")
+		      (unless (null (object-level rv))
+			(dolist (creature (level-creatures (object-level rv)))
+			  (debug-print 50 "Sending bat signal -> ~a!.~%" creature)
+			  (run-hooks creature :bat-signal)))))
     (install-stateai rv
-		     #'stateai-harmless-until-provoked
+		     #'stateai-harmless-until-approached
 		     10
 		     :cooldown-while-visible nil
 		     :enrage-message nil
 		     :calm-message nil
+		     :radius 0
 		     :enraged-behaviour #'ai-fair-search-player-and-destroy
 		     :calm-behaviour #'ai-seek-darkness)
     rv))

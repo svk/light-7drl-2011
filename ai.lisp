@@ -154,13 +154,13 @@
 		   (select-random-or-direct-to target creature))
    (follow-stepmap-search creature
 			  (get-stepmap-to target)
-			  20
+			  15
 			  (select-random-or-direct-to target creature))
    (naive-step-to target creature)
    (select-random *directions*)))
 
 (defun ai-seek-darkness (creature)
-  (let ((tac-view (find-reachable-tiles creature 5)))
+  (let ((tac-view (find-reachable-tiles creature 3)))
     (flet ((get-lighting (list) (tile-lighting (third list))))
       (let ((minimal-lighting (apply #'min (mapcar #'get-lighting tac-view))))
 	(let ((minimal-lists (remove-if-not
@@ -312,6 +312,11 @@
 	     (setf state :provoked
 		   cooldown delay)))
       (install-hook creature
+		    :provoke
+		    #'(lambda ()
+			(debug-print 50 "Provoked by signal!~%")
+			(provoke)))
+      (install-hook creature
 		    :after-attacked
 		    #'(lambda (attacker)
 			(unless (not (alive? creature))
@@ -415,7 +420,7 @@
 				     :initial-element nil)))
 		(setf (aref arr (creature-x creature) (creature-y creature))
 		      0)
-		(stabilize-stepmap arr (object-level creature) 20))))))
+		(stabilize-stepmap arr (object-level creature) 15))))))
 
 (defmethod make-tactical-stepmap-to ((creature creature) (mover creature))
   (with-slots (stepmap-to)
@@ -434,6 +439,6 @@
 	       (get-stepmap-base level
 				 #'(lambda (tile) (tile-dark tile)))
 	       level
-	       20))))
+	       15))))
   (defun invalidate-stepmap-to-darkness ()
     (setf darkness-stepmap nil)))
