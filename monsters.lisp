@@ -25,7 +25,7 @@
 	     :damage (make-dice-roll :number-of-dice 2
 				     :dice-size 6)
 	     :dodge-multiplier 1
-	     :max-hp 20
+	     :max-hp 10
 	     :light-vulnerable t
 	     :darkness-regenerating t
 	     :ai #'ai-search-player-and-destroy)))
@@ -41,7 +41,7 @@
 	     :damage (make-dice-roll :number-of-dice 4
 				     :dice-size 6)
 	     :dodge-multiplier 0
-	     :max-hp 1
+	     :max-hp 50
 	     :darkness-regenerating t
 	     :light-vulnerable t
 	     :ai #'ai-boss-shadowlord)))

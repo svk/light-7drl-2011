@@ -49,9 +49,11 @@
       creature
     (cond ((and (tile-dark tile)
 		darkness-regenerating)
+	   (debug-print 50 "~a IS REGENERATING DARKNESS~%" creature)
 	   (setf hp (min max-hp (+ hp 1))))
-	  ((and (> (tile-lighting tile) 1/2)
+	  ((and (> (tile-lighting tile) 1/3)
 		light-vulnerable)
+	   (debug-print 50 "~a IS TAKING LIGHT DAMAG~%" creature)
 	   (damage creature 1))))
   (unless (not (get-status creature :poison))
     (damage creature 1)))
