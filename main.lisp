@@ -168,7 +168,15 @@
 				 (+ 1 (- +screen-height+ +ui-bottom-lines+))
 				 :set
 				 :left
-				 (make-statusline-2))))
+				 (make-statusline-2))
+	  (tcod:console-print-rect-ex tcod:*root*
+				      0
+				      (+ 2 (- +screen-height+ +ui-bottom-lines+))
+				      +screen-width+
+				      2
+				      :set
+				      :left
+				      (make-inventory-lines))))
     (tcod:console-flush)
 	  
     (debug-print 100 "Handling input.~%")
@@ -184,6 +192,26 @@
     (debug-print 100 "Game-text-buffer is now: ~a.~%" *game-text-buffer*))
 
   (terminate))
+
+(defun format-item (item)
+  (let ((suffixes nil)
+	(main (format nil "~a: ~a" (item-inventory-slot item) (indefinite-noun (item-name item )))))
+    (if (eq (creature-weapon *game-player*) item)
+	(push "wielded" suffixes))
+    (if (not (null (item-ammo item)))
+	(push (format nil "~a" (item-ammo item)) suffixes))
+    (if suffixes
+	(format nil "~a (~a)" main (comma-join suffixes))
+	main)))
+
+(defun make-inventory-lines ()
+  (if (null *game-player*)
+      ""
+      (list-join
+       (mapcar #'format-item
+	       (remove-if-not #'identity
+			      (mapcar #'(lambda (i-slot) (creature-get-item-by-slot *game-player* i-slot))
+				      *inventory-chars*))))))
 
 (defun make-statusline ()
   (if (null *game-player*)
@@ -201,6 +229,8 @@
 	  (push "Darkness " statuses))
 	(unless (not (get-status *game-player* :poison))
 	  (push "Poisoned " statuses))
+	(unless (not (creature-is-burdened? *game-player*))
+	  (push "Burdened " statuses))
 	(apply #'concatenate (cons 'string statuses)))))
     
 	  
@@ -238,13 +268,14 @@
 	      (#\W (signal 'game-over :type :victory))
 	      (#\. (player-wait))
 	      (#\a (try-use-special))
-	      (#\d (try-player-drop-stack))
+	      (#\d (try-player-drop-query))
+	      (#\x (try-player-apply-query))
 	      (#\, (try-player-pick-up-stack))
 	      (#\V (toggle *cheat-lightall*))
 	      (#\T (toggle *ai-test-fleeing*))
 	      (#\: (enter-look-mode (object-level *game-player*) (player-x) (player-y)))
-	      (#\X (cheat-spawn-thingy))
-	      (#\C (cheat-spawn-doodad))
+	      (#\X (spawn-item-for *game-player* #'make-healing-potion))
+	      (#\C (spawn-item-for *game-player* #'make-antidote-potion))
 	      (#\Q (query-confirm "Really quit?" #'quit-game))
 	      (t (handle-input value stack)))))))
 

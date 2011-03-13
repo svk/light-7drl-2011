@@ -29,9 +29,10 @@
 (defun place-hole (level x y)
   (let ((tile (tile-at level x y)))
     (setf (tile-appearance tile)
-	  (make-appearance :glyph (char-code #\ )
+	  (make-appearance :glyph 254
 			   :foreground-colour '(0 0 0)
-			   :background-colour '(0 0 0)))
+			   :background-colour (appearance-background-colour
+					       (tile-appearance tile))))
     (setf (tile-special tile) :hole)))
 
 (defun first-n (n list)

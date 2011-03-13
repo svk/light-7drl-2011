@@ -47,7 +47,20 @@
    (name :accessor item-name
 	 :initarg :name)
    (heavy :initarg :heavy
-	  :initform nil)))
+	  :initform nil)
+   (type :accessor item-type
+	 :initarg :type)
+   (inventory-slot :accessor item-inventory-slot
+		   :initform nil)
+   (active :accessor item-active
+	   :initarg :active
+	   :initform nil)
+   (attack-power :accessor item-attack-power
+		 :initform nil
+		 :initarg :attack-power)
+   (ammo :accessor item-ammo
+	 :initform nil
+	 :initarg :ammo)))
 
 (defclass creature (radiant)
   ((appearance :accessor creature-appearance
@@ -91,7 +104,10 @@
    (hooks :initform (make-hash-table))
    (dodge-multiplier :initform 1
 		     :initarg :dodge-multiplier)
-   (statuses :initform nil)))
+   (statuses :initform nil)
+   (weapon 
+    :accessor creature-weapon
+    :initform nil)))
 
 (defstruct status-attack
   type

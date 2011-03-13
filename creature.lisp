@@ -23,6 +23,13 @@
 				    :y nil
 				    :intensity light-intensity))))
 
+(defmethod remove-status ((creature creature) type)
+  (with-slots (statuses)
+      creature
+    (setf statuses
+	  (remove-if #'(lambda (x) (equal x type)) statuses :key #'identity))))
+
+
 (defmethod get-status ((creature creature) type)
   (with-slots (statuses)
       creature
@@ -145,14 +152,36 @@
       creature
     (let ((current-hooks (gethash hook-name hooks nil)))
       (setf (gethash hook-name hooks) (cons f current-hooks)))))
+
+(defmethod get-base-hit-chance ((creature creature))
+  (with-slots (items weapon base-hit-chance)
+      creature
+    (if (null weapon)
+	base-hit-chance
+	(if (find weapon items)
+	    (first (item-attack-power weapon))
+	    (progn
+	      (setf weapon nil)
+	      base-hit-chance)))))
+
+(defmethod get-base-damage ((creature creature))
+  (with-slots (items weapon base-damage)
+      creature
+    (if (null weapon)
+	base-damage
+	(if (find weapon items)
+	    (second (item-attack-power weapon))
+	    (progn
+	      (setf weapon nil)
+	      base-damage)))))
   
 (defmethod melee-attack ((target creature) (attacker creature))
   (with-slots (base-hit-chance base-damage attack-verb hit-verb miss-verb attack-inflicts-status)
       attacker
     (let ((hit-chance (with-slots (dodge-multiplier)
 			  target
-			(multiply-chance-by base-hit-chance dodge-multiplier)))
-	  (dice-roll base-damage)
+			(multiply-chance-by (get-base-hit-chance attacker) dodge-multiplier)))
+	  (dice-roll (get-base-damage attacker))
 	  (player-visible (or (visible-to? target *game-player*)
 			      (visible-to? attacker *game-player*)))
 	  (t-noun (creature-name target))

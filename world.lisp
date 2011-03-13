@@ -331,12 +331,31 @@
   (buffer-clear))
 
 (defun player-took-action ()
-  (tick-world))
+  (dotimes (i (if (creature-is-burdened? *game-player*)
+		  2
+		  1))
+    (tick-world)))
+
+(defun query-inventory-item (question f-result)
+  (let ((letterset (remove-if-not #'(lambda (islot) (creature-get-item-by-slot *game-player* islot))
+				  *inventory-chars*)))
+    (query-letterset
+     (concatenate 'string
+		  question
+		  " "
+		  (letterset-join letterset))
+     letterset
+     #'(lambda (letter) (unless (null letter)
+			  (funcall f-result
+				   (creature-get-item-by-slot *game-player* letter))))
+     :allow-cancel t)))
+
 
 (defun player-x () (car (creature-xy *game-player*)))
 (defun player-y () (cdr (creature-xy *game-player*)))
 
 (defun creature-give (creature item)
+  (item-given item creature)
   (debug-print 10 "Giving item \"~a\" to creature \"~a\"" (item-name item) (creature-name creature))
   (push item (creature-items creature))
   (debug-print 10 "Inventory is now ~a.~%" (mapcar #'item-name (creature-items creature)))
@@ -349,11 +368,14 @@
 
 (defun creature-pick-up (creature item)
   (let ((tile (creature-tile creature)))
-    (setf (tile-items tile) (remove item (tile-items tile)))
-    (picked-up item)
-    (creature-give creature item)))
+    (unless (not (creature-has-inventory-room-for? creature item))
+      (setf (tile-items tile) (remove item (tile-items tile)))
+      (picked-up item)
+      (creature-give creature item))))
 
 (defun creature-drop (creature item)
+  (if (eq (creature-weapon creature) item)
+      (setf (creature-weapon creature) nil))
   (unless (null (creature-take creature item))
     (drop-at item (object-level creature) (creature-x creature) (creature-y creature))
     item))
@@ -424,10 +446,41 @@
     (clear-lighting level)
     lights))
 
+(defun may-snuff-fires? ()
+  (consume-fire-snuff-charge t))
+
+(defun may-light-fires? ()
+  (consume-fire-light-charge t))
+
+(defun creature-active-items (creature)
+  (remove-if-not #'item-active (creature-items creature)))
+
+(defun active-items (itemset)
+  (remove-if-not #'item-active itemset))
+
+(defun consume-fire-light-charge (&optional (dry-run nil))
+  (declare (ignore dry-run))
+  (if (or (find :tinderbox (creature-items *game-player*) :key #'item-type)
+	  (find :torch (creature-active-items *game-player*) :key #'item-type)
+	  (find :brazier (creature-active-items *game-player*) :key #'item-type)
+	  (find :brazier (active-items (tile-items (creature-tile *game-player*))) :key #'item-type))
+      t
+      nil)) ;; no matches yet
+  
+(defun consume-fire-snuff-charge (&optional (dry-run nil))
+  (declare (ignore dry-run))
+  (if (find :blanket (creature-items *game-player*) :key #'item-type)
+      t
+      nil)) ;; no matches yet
+  
+
 (defun try-player-pick-up (item)
-  (unless (null (creature-pick-up *game-player* item))
-    (player-took-action)
-    (buffer-show "You pick up ~a." (definite-noun (item-name item)))))
+  (if (null (creature-pick-up *game-player* item))
+      (progn
+	(buffer-show "You can't pick up ~a, you're holding too many things already." (definite-noun (item-name item))))
+      (progn
+	(player-took-action)
+	(buffer-show "You pick up ~a." (definite-noun (item-name item))))))
 
 (defun try-player-drop (item &optional (confirmed nil))
   (player-taking-action)
@@ -446,6 +499,26 @@
   (if (null (creature-items *game-player*))
       (buffer-show "You're not holding anything you could drop.")
       (try-player-drop (car (creature-items *game-player*)))))
+
+(defun try-player-drop-query ()
+  (if (null (creature-items *game-player*))
+      (buffer-show "You're not holding anything you could drop.")
+      (query-inventory-item "Drop what?"
+			    #'(lambda (item)
+				(unless (null item)
+				  (debug-print 50 "YO dropping ~a~%" item)
+				  (try-player-drop item)
+				  (player-took-action))))))
+
+(defun try-player-apply-query ()
+  (if (null (creature-items *game-player*))
+      (buffer-show "You're not holding anything you could use.")
+      (query-inventory-item "Use what?"
+			    #'(lambda (item)
+				(unless (null item)
+				  (player-use item)
+				  (player-took-action))))))
+
 
 (defun try-player-pick-up-stack ()
   (let ((tile (tile-at *game-current-level* (player-x) (player-y))))
@@ -622,10 +695,8 @@
 						       :foreground-colour '(0 0 255))
 			  :name (make-proper-noun player-name)
 			  :gender player-gender
-			  :hit-chance (make-chance-roll :success-chance 3/4)
-			  :damage (make-dice-roll :number-of-dice 2
-						  :dice-size 6
-						  :constant 4)
+			  :hit-chance (first *fist-power*)
+			  :damage (second *fist-power*)
 			  :max-hp 100)
 			 *game-current-level*))
     (install-hook *game-player* :before-death
@@ -634,10 +705,18 @@
 		      (signal 'game-over
 			      :type :death)))
     (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
-;    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
-;      (dolist (ls light-sources)
-;	(push ls *game-braziers*))
-;      (debug-print 50 "Generated light sources: ~a.~%" light-sources))
+    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
+      (let ((ls (pop light-sources)))
+	(drop-at (make-brazier :status :lit)
+		 *game-current-level*
+		 (light-source-x ls)
+		 (light-source-y ls)))
+      (dolist (ls light-sources)
+	(drop-at (make-brazier)
+		 *game-current-level*
+		 (light-source-x ls)
+		 (light-source-y ls)))
+      (debug-print 50 "Generated light sources: ~a.~%" light-sources))
     (setf *game-torch* (make-light-source
 			:x (player-x)
 			:y (player-y)
@@ -647,12 +726,7 @@
 	(spawn-creature (make-rat) *game-current-level*))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
-		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
-							   :foreground-colour '(0 0 0))
-			      :name n-sword
-			      :light-source (make-light-source :x nil
-							       :y nil
-							       :intensity 0.9)))
+		   (make-knife))
     (debug-print 50 "Printing welcome messages.~%")
     (buffer-show "Welcome to Light7DRL!")
     (buffer-show "How pitiful ~a tale!" (player-possessive))

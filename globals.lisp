@@ -24,7 +24,7 @@
 (defparameter *tileset-file* "my-tiles.png")
 
 (defconstant +ui-top-lines+ 5)
-(defconstant +ui-bottom-lines+ 2)
+(defconstant +ui-bottom-lines+ 4)
 
 (defparameter *game-current-level* nil)
 
@@ -120,9 +120,7 @@
   (debug-print 45 "Hook layers: ~a.~%" (length *game-input-hooks-stack*)))
 
 
-
-
-(defun query-letterset (question letterset f-result)
+(defun query-letterset (question letterset f-result &key (allow-cancel nil))
   (debug-print 10 "Asking to confirm query: ~a~%" question)
   (buffer-clear)
   (buffer-show "~a" question)
@@ -133,6 +131,12 @@
 		     (buffer-clear)
 		     (pop-hooks)
 		     (funcall f-result value))
+		    ((and allow-cancel
+			  (or (eq :enter value)
+			      (eq :space value)))
+		     (buffer-clear)
+		     (pop-hooks)
+		     (funcall f-result nil))
 		    (t
 		     (buffer-clear)
 		     (buffer-show "~a" question))))))
@@ -258,5 +262,12 @@
 
 (define-condition game-over ()
   ((type :initarg :type)))
-  
-  
+
+(defconstant +torch-ammo+ 100)
+
+(defparameter *inventory-chars* (list #\a #\b #\c #\d))
+
+(defun zip (a b)
+  (cond ((or (null a) (null b))
+	 nil)
+	(t (cons (cons (car a) (car b)) (zip (cdr a) (cdr b))))))

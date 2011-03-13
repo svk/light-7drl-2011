@@ -216,6 +216,28 @@
 	(1)
 	(t (format out " "))))))
 
+(defun comma-join (strings)
+  (with-output-to-string (out)
+    (do ((count (length strings) (- count 1))
+	 (more-strings strings (cdr more-strings)))
+	((zerop count))
+      (format out "~a" (car more-strings))
+      (case count
+	(1)
+	(t (format out ", "))))))
+
+(defun letterset-join (strings)
+  (with-output-to-string (out)
+    (format out "[")
+    (do ((count (length strings) (- count 1))
+	 (more-strings strings (cdr more-strings)))
+	((zerop count))
+      (format out "~a" (car more-strings))
+      (case count
+	(1)
+	(t (format out "/"))))
+    (format out "]")))
+
 (defun capitalize (string)
   (format nil "~a~a" (char-upcase (aref string 0)) (subseq string 1)))
 
