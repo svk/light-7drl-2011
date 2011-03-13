@@ -285,6 +285,7 @@
     rv))
 
 (defun update-world ()
+  (invalidate-stepmap-to-darkness)
   (clear-lighting)
   (dolist (item (level-floor-items *game-current-level*))
     (emit-light item))
@@ -320,6 +321,8 @@
   ;; might be in an inconsistent state during a turn (inconsistent with the
   ;; light sources).
   (tick-creatures (level-creatures *game-current-level*))
+  (dolist (item (level-floor-items *game-current-level*))
+    (tick item))
   (debug-print 50 "Ticking.~%")
   (update-world))
 
@@ -668,6 +671,7 @@
       (buffer-show "A chunk of the floor loosens and falls beside you!"))))
 
 (defun go-to-next-level (&optional (involuntary nil))
+  (invalidate-stepmap-to-darkness)
   (unless (not involuntary)
     (buffer-show "You fall into a hole!"))
   (signal 'game-over :type :victory))
@@ -723,7 +727,7 @@
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
     (debug-print 50 "what the fuck should spawn creature")
     (dotimes (i 5)
-	(spawn-creature (make-rat) *game-current-level*))
+	(spawn-creature (make-bat) *game-current-level*))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-knife))

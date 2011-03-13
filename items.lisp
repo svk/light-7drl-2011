@@ -12,7 +12,7 @@
 (defnoun n-healing-potion "a" "red potion" "red potions")
 (defnoun n-antidote-potion "a" "blue potion" "blue potions")
 
-(defnoun n-fireproof "a" "fireproof blanket" "fireproof blankets")
+(defnoun n-blanket "a" "fireproof blanket" "fireproof blankets")
 
 (defparameter *fist-power* (list (make-chance-roll :success-chance 1/2)
 				 (make-dice-roll :number-of-dice 1
@@ -61,6 +61,12 @@
 	     :attack-power *knife-power*
 	     :name n-knife))
 
+(defun make-blanket ()
+  (make-item :appearance (make-appearance :glyph (char-code #\%)
+					  :foreground-colour '(255 255 255))
+	     :type :blanket
+	     :name n-blanket))
+
 
 (defun make-healing-potion ()
   (make-item :appearance (make-appearance :glyph (char-code #\&)
@@ -86,7 +92,10 @@
 	     :type :torch
 	     :name n-torch
 	     :ammo +torch-ammo+
-	     :active nil))
+	     :active nil
+	     :light-source (make-light-source :x nil
+					      :y nil
+					      :intensity +torch-max-intensity+)))
 
 (defun make-brazier (&key (status nil))
   (make-item :appearance (make-appearance :glyph (char-code #\#)
@@ -100,4 +109,4 @@
 		       (nil (select-random '(t nil))))
 	     :light-source (make-light-source :x nil
 					      :y nil
-					      :intensity 0.5)))
+					      :intensity +brazier-intensity+)))

@@ -1,5 +1,17 @@
 (in-package :light-7drl)
 
+(defun get-stepmap-base (level selector)
+  (with-slots (tiles)
+      level
+    (let ((rv (make-array (array-dimensions tiles) :initial-element nil)))
+      (dotimes (x +map-width+)
+	(dotimes (y +map-height+)
+	  (setf (aref rv x y)
+		(if (funcall selector (aref tiles x y))
+		    0
+		    nil))))
+      rv)))
+
 (defun level-add-delayed-spawn (level n f)
   "Run a spawn method such that we can never disprove that the spawn was to a tile among the last n to be explored."
   (push (list n f) (level-delayed-spawns level)))

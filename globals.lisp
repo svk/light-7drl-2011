@@ -264,6 +264,8 @@
   ((type :initarg :type)))
 
 (defconstant +torch-ammo+ 100)
+(defconstant +torch-max-intensity+ 0.5)
+(defconstant +brazier-intensity+ 0.5)
 
 (defparameter *inventory-chars* (list #\a #\b #\c #\d))
 

@@ -41,6 +41,8 @@
     (unless (null ai)
       (dotimes (i speed)
 	(funcall ai creature))))
+  (dolist (item (creature-items creature))
+    (tick item))
   (unless (not (get-status creature :poison))
     (damage creature 1)))
 

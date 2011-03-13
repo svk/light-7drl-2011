@@ -274,8 +274,8 @@
 	      (#\V (toggle *cheat-lightall*))
 	      (#\T (toggle *ai-test-fleeing*))
 	      (#\: (enter-look-mode (object-level *game-player*) (player-x) (player-y)))
-	      (#\X (spawn-item-for *game-player* #'make-healing-potion))
-	      (#\C (spawn-item-for *game-player* #'make-antidote-potion))
+	      (#\X (spawn-item-for *game-player* #'make-torch))
+	      (#\C (spawn-item-for *game-player* #'make-blanket))
 	      (#\Q (query-confirm "Really quit?" #'quit-game))
 	      (t (handle-input value stack)))))))
 

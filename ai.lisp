@@ -1,5 +1,22 @@
 (in-package :light-7drl)
 
+(defun ai-random-walk-satisfying (creature f)
+  (let ((moves (remove-if-not #'(lambda (dxdy)
+				  (let ((tile (tile-at (object-level creature)
+						       (+ (creature-x creature) (car dxdy))
+						       (+ (creature-y creature) (cdr dxdy)))))
+				    (and 
+				     (creature-can-walk? creature tile)
+				     (funcall f tile))))
+			      *directions*)))
+    (unless (null moves)
+      (let ((xy (select-random moves)))
+	(try-move-creature creature (car xy) (cdr xy))))))
+
+(defun ai-random-dark-walk (creature)
+  (ai-random-walk-satisfying creature #'tile-dark))
+  
+
 (defun ai-random-walk (creature)
   (debug-print 50 "AI random-walk triggers on ~a." (creature-name creature))
   (let ((moves (remove-if-not #'(lambda (dxdy)
@@ -11,6 +28,18 @@
     (unless (null moves)
       (let ((xy (select-random moves)))
 	(try-move-creature creature (car xy) (cdr xy))))))
+
+(defun ai-random-walk-restricted (creature restrict)
+  (let ((moves (remove-if-not #'(lambda (dxdy)
+				  (creature-can-walk? creature 
+						      (tile-at (object-level creature)
+							       (+ (creature-x creature) (car dxdy))
+							       (+ (creature-y creature) (cdr dxdy)))))
+			      *directions*)))
+    (unless (null moves)
+      (let ((xy (select-random (funcall restrict moves))))
+	(try-move-creature creature (car xy) (cdr xy))))))
+
 
 (defun make-step-or-random (creature step)
   (if (or (null step)
@@ -125,10 +154,67 @@
 		   (select-random-or-direct-to target creature))
    (follow-stepmap-search creature
 			  (get-stepmap-to target)
-			  10
+			  20
 			  (select-random-or-direct-to target creature))
    (naive-step-to target creature)
    (select-random *directions*)))
+
+(defun ai-seek-darkness (creature)
+  (let ((level (object-level creature))
+	(x (creature-x creature))
+	(y (creature-y creature)))
+    (ai-random-walk-restricted
+     creature
+     #'(lambda (xys)
+	 (let ((target-light (apply #'min (mapcar #'(lambda (xy) (tile-lighting (tile-at level (+ x (car xy)) (+ y (cdr xy))))) xys))))
+	   (remove-if-not
+	    #'(lambda (v) (eql v target-light))
+	    xys
+	    :key #'(lambda (xy) (tile-lighting (tile-at level (+ x (car xy)) (+ y (cdr xy)))))))))))
+
+(defun xy-is-wall? (xy)
+  (let ((level (object-level *game-player*)))
+    (or (not (array-in-bounds-p (level-tiles level) (car xy) (cdr xy)))
+	(not (tile-walkable (tile-at level (car xy) (cdr xy)))))))
+
+(defun extract-values (array)
+  (let ((rv nil))
+    (dotimes (x +map-width+)
+      (dotimes (y +map-height+)
+	(unless (null (aref array x y))
+	  (push (aref array x y) rv))))
+    rv))
+
+(defun find-reachable-tiles (creature depth &optional (xy-is-obstacle? #'xy-is-wall?))
+  (let* ((q-end (cons nil nil))
+	 (q q-end)
+	 (x (creature-x creature))
+	 (y (creature-y creature))
+	 (level (object-level creature))
+	 (a (make-array (array-dimensions (level-tiles (object-level creature))) :initial-element nil)))
+    (flet ((addq (elt)
+	     (setf (car q-end) elt)
+	     (setf q-end
+		   (setf (cdr q-end) (cons nil nil)))))
+      (setf (aref a x y) (list 0 nil (tile-at level x y) (cons x y)))
+      (dolist (nxy (remove-if xy-is-obstacle? (neighbours-of x y)))
+	(setf (aref a (car nxy) (cdr nxy)) (list 1 nxy (tile-at level (car nxy) (cdr nxy)) nxy))
+	(addq nxy))
+      (do ((qe (car q) (car q))
+	   (q (cdr q) (cdr q)))
+	  ((null qe) (extract-values a))
+	(debug-print 50 "Popped ~a [~a]~%" qe (aref a (car qe) (cdr qe)))
+	(dolist (nxy (remove-if xy-is-obstacle? (neighbours-of (car qe) (cdr qe))))
+	  (let ((old-value (aref a (car qe) (cdr qe)))
+		(n-x (car nxy))
+		(n-y (cdr nxy)))
+	    (unless (aref a n-x n-y)
+	      (unless (<= (+ 1 (first old-value)) depth)
+		(return-from find-reachable-tiles (extract-values a)))
+	      (setf (aref a n-x n-y)
+		    (list (+ 1 (first old-value)) (second old-value) (tile-at level n-x n-y) nxy))
+	      (addq nxy))))))))
+	       
 
 (defun sad-flee (origin creature)
   (let ((step (sad-search origin creature)))
@@ -169,7 +255,7 @@
 	   (emit-visual creature argument))
 	  (argument (emit-visual creature default)))))
 
-(defun stateai-harmless-until-provoked (creature delay &key (cooldown-while-visible nil) (enrage-message t) (calm-message t) (enraged-behaviour #'ai-fair-search-player-and-destroy))
+(defun stateai-harmless-until-provoked (creature delay &key (cooldown-while-visible nil) (enrage-message t) (calm-message t) (enraged-behaviour #'ai-fair-search-player-and-destroy) (calm-behaviour #'ai-random-walk))
   (let ((state :harmless)
 	(cooldown nil))
     (install-hook creature
@@ -186,7 +272,7 @@
 			    cooldown delay)))
     #'(lambda (creature)
 	(case state
-	  (:harmless (ai-random-walk creature))
+	  (:harmless (funcall calm-behaviour creature))
 	  (:provoked
 	   (flet ((dec-cooldown ()
 		    (decf cooldown)
@@ -207,7 +293,7 @@
 		    (ai-random-walk creature))
 		   (t (funcall enraged-behaviour creature)))))))))
 
-(defun stateai-harmless-until-approached (creature delay &key radius (cooldown-while-visible nil) (enrage-message t) (calm-message t) (enraged-behaviour #'ai-fair-search-player-and-destroy))
+(defun stateai-harmless-until-approached (creature delay &key radius (cooldown-while-visible nil) (enrage-message t) (calm-message t) (enraged-behaviour #'ai-fair-search-player-and-destroy) (calm-behaviour #'ai-random-walk))
   (let ((state :harmless)
 	(cooldown nil))
     (flet ((provoke ()
@@ -234,7 +320,7 @@
 	       (visible-to? *game-player* creature))
 	      (provoke))
 	  (case state
-	    (:harmless (ai-random-walk creature))
+	    (:harmless (funcall calm-behaviour creature))
 	    (:provoked
 	     (flet ((dec-cooldown ()
 		      (decf cooldown)
@@ -323,7 +409,7 @@
 				     :initial-element nil)))
 		(setf (aref arr (creature-x creature) (creature-y creature))
 		      0)
-		(stabilize-stepmap arr (object-level creature) 10))))))
+		(stabilize-stepmap arr (object-level creature) 20))))))
 
 (defmethod make-tactical-stepmap-to ((creature creature) (mover creature))
   (with-slots (stepmap-to)
@@ -333,3 +419,15 @@
       (setf (aref arr (creature-x creature) (creature-y creature))
 	    0)
       (stabilize-stepmap arr (object-level creature) 5 #'(lambda (tile) (creature-can-walk? mover tile))))))
+
+(let ((darkness-stepmap nil))
+  (defun get-stepmap-to-darkness (level)
+    (or darkness-stepmap
+	(setf darkness-stepmap
+	      (stabilize-stepmap
+	       (get-stepmap-base level
+				 #'(lambda (tile) (tile-dark tile)))
+	       level
+	       20))))
+  (defun invalidate-stepmap-to-darkness ()
+    (setf darkness-stepmap nil)))

@@ -153,3 +153,16 @@
 	    (null light-source))
 	0
 	(light-source-intensity light-source))))
+
+(defmethod tick ((item item))
+  (with-slots (active light-source ammo)
+      item
+    (unless (not (and active light-source ammo))
+	(decf ammo)
+	(setf ammo (max 0 ammo))
+	(if (<= ammo 0)
+	    (setf active nil)
+	    (setf (light-source-intensity light-source)
+		  (* +torch-max-intensity+
+		     (/ ammo +torch-ammo+)))))))
+	

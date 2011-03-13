@@ -3,8 +3,35 @@
 (defnoun n-glowbug "a" "glow-bug" "glow-bugs")
 (defnoun n-rat "a" "rat" "rats")
 (defnoun n-snake "a" "viper" "vipers")
+(defnoun n-bat "a" "bat" "bats")
 
 (defverb-23p v-is-poisoned "are poisoned" "is poisoned")
+
+(defun make-bat ()
+  (let ((rv (make-creature
+	     :appearance (make-appearance :glyph (char-code #\b)
+					  :foreground-colour '(255 255 255))
+	     :name n-bat
+	     :gender nil
+	     :darkvision t
+	     :hit-chance (make-chance-roll :success-chance 3/4)
+	     :damage (make-dice-roll :number-of-dice 1
+				     :dice-size 6)
+	     :dodge-multiplier 1/2
+	     :max-hp 5)))
+    (install-hook rv
+		  :bat-signal
+		  #'(lambda ()
+		      (run-hooks rv :provoke)))
+    (install-stateai rv
+		     #'stateai-harmless-until-provoked
+		     10
+		     :cooldown-while-visible nil
+		     :enrage-message nil
+		     :calm-message nil
+		     :enraged-behaviour #'ai-fair-search-player-and-destroy
+		     :calm-behaviour #'ai-seek-darkness)
+    rv))
 
 (defun make-snake ()
   (let ((rv (make-creature
@@ -15,7 +42,6 @@
 	     :hit-chance (make-chance-roll :success-chance 3/4)
 	     :damage (make-dice-roll :number-of-dice 1
 				     :dice-size 0)
-	     :dodge-multiplier 1/2
 	     :attack-inflicts-status (make-status-attack :type :poison
 							 :verb v-is-poisoned)
 	     :max-hp 5)))
