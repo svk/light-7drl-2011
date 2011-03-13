@@ -363,6 +363,36 @@
 	  (t
 	   (funcall otherwise creature)))))
 
+(defun ai-boss-shadowlord (creature)
+  (ignore-errors
+    (debug-print 50 "slord: ~a" *game-player*)
+    (debug-print 50 "~a (~a ~a) ~a"
+		 *game-player*
+		 (object-level creature)
+		 (object-level *game-player*)
+		 (eq (object-level creature)
+		     (object-level *game-player*))))
+
+  (unless (or (null *game-player*)
+	      (not (eq (object-level creature)
+		       (object-level *game-player*))))
+    (debug-print 50 "Shadowlord is walking.~%")
+    (let ((z (random 1.0)))
+      (debug-print 50 "Shadowlord is walking!.~%")
+      (cond ((adjacent-to? *game-player* creature)
+	     (debug-print 50 "Shadowlord is attcking.~%")
+	     (melee-attack *game-player* creature))
+	    ((< z 2/10)
+	     (debug-print 50 "Shadowlord is summoning.~%")
+	     (spawn-creature (make-shadow) (object-level creature)))
+	    ((and (< (distance (creature-x creature) (creature-y creature)
+			       (player-x) (player-y)))
+		  (not (ai-trigger-imperfection?)))
+	     (debug-print 50 "Shadowlord is searching.~%")
+	     (ai-fair-search-player-and-destroy creature))
+	    (t
+	     (ai-random-walk creature))))))
+
 (defun ai-search-player-and-destroy (creature)
   (let ((target *game-player*))
     (cond ((adjacent-to? target creature)

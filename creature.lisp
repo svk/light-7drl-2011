@@ -1,6 +1,6 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil) (dodge-multiplier 1) (attack-inflicts-status nil))
+(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil) (dodge-multiplier 1) (attack-inflicts-status nil) (darkness-regenerating nil) (light-vulnerable nil))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
@@ -15,6 +15,8 @@
 		 :miss-verb miss-verb
 		 :hit-verb hit-verb
 		 :speed speed
+		 :darkness-regenerating darkness-regenerating
+		 :light-vulnerable light-vulnerable
 		 :attack-inflicts-status attack-inflicts-status
 		 :dodge-multiplier dodge-multiplier
 		 :light-source (if light-intensity
@@ -43,6 +45,14 @@
 	(funcall ai creature))))
   (dolist (item (creature-items creature))
     (tick item))
+  (with-slots (light-vulnerable darkness-regenerating hp max-hp tile)
+      creature
+    (cond ((and (tile-dark tile)
+		darkness-regenerating)
+	   (setf hp (min max-hp (+ hp 1))))
+	  ((and (> (tile-lighting tile) 1/2)
+		light-vulnerable)
+	   (damage creature 1))))
   (unless (not (get-status creature :poison))
     (damage creature 1)))
 
@@ -245,7 +255,10 @@
 	     (creature-y creature)))
   (setf (creature-items creature) nil)
   (run-hooks creature :before-death)
-  (remove-from-map creature)
+  (if (eq creature *game-player*)
+      (pop-hooks)
+      (remove-from-map creature))
+  (run-hooks creature :after-death)
   (unless (not (visible-to? creature *game-player*))
     (buffer-show-cap "~a!" (dnoun-verbs (creature-name creature)
 					(creature-death-verb creature)))))

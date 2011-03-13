@@ -80,6 +80,8 @@
 
 (defparameter *universal-light-half-life* (light-half-life 4))
 
+(defparameter *current-level-no* nil)
+
 (defparameter *game-input-hooks-stack* nil)
 
 (defparameter *game-special-screen-stack* nil)

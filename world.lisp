@@ -720,7 +720,7 @@
   (invalidate-stepmap-to-darkness)
   (unless (not involuntary)
     (buffer-show "You fall into a hole!"))
-  (setf *game-current-level* (generate-finished-level))
+  (setf *game-current-level* (generate-level-no (incf *current-level-no*)))
   (remove-from-map *game-player*)
   (spawn-creature *game-player* *game-current-level*)
   (update-world))
@@ -755,12 +755,38 @@
 			  #'(lambda ()
 			      (go-to-next-level))))))
 
-(defun generate-finished-level ()
+(defun generate-finished-level (a b c)
   (postprocess-level
    (create-level-generated +map-width+ +map-height+)
-   *default-monster-constructors*
-   *default-item-constructors*
-   (make-dice-roll :number-of-dice 2 :dice-size 3)))
+   a
+   b
+   c))
+
+(defun generate-final-level ()
+  (let ((rv (create-level-generated +map-width+ +map-height+)))
+    (populate-level-braziers rv (make-dice-roll :number-of-dice 5
+						:dice-size 1))
+    (spawn-item (make-tinderbox) rv)
+    (spawn-creature (make-shadow-lord) rv)
+    (dolist (item (level-floor-items rv))
+      (with-slots (active)
+	  item
+	(setf active nil)))
+    (buffer-show "An angelic voice from the darkness whispers to you: \"You have done well, child, but there is yet one challenge you must face.\"")
+    (buffer-show "\"Use what you have learned to bring a light to this darkness and you will find your way home...\"")
+    (buffer-show "You feel a warm glow about you.")
+    (with-slots (light-source)
+	*game-player*
+      (setf light-source (make-light-source :x nil
+					    :y nil
+					    :intensity 1/64)))
+    rv))
+
+(defun generate-level-no (i)
+  (let ((guides (nth i *level-generation-info*)))
+    (if (null guides)
+	(generate-final-level)
+	(apply #'generate-finished-level guides))))
 
 (defun initialize-first-game-with-info (player-name player-gender)
   (let ((map-width +screen-width+)
@@ -768,8 +794,9 @@
     (debug-print 50 "INITIALIZING GAME HELLO")
     (push-hooks #'ignore-input)
     (push-special-screen (make-centered-text-special-screen "Please wait..."))
+    (setf *current-level-no* 0)
     (setf *game-current-level*
-	  (generate-finished-level))
+	  (generate-level-no *current-level-no*))
     (setf *game-player* (spawn-creature 
 			 (make-creature
 			  :appearance (make-appearance :glyph +player-glyph+
@@ -780,7 +807,7 @@
 			  :damage (second *fist-power*)
 			  :max-hp 100)
 			 *game-current-level*))
-    (install-hook *game-player* :before-death
+    (install-hook *game-player* :after-death
 		  #'(lambda ()
 		      (debug-print 1 "Triggering player death hook.~%")
 		      (signal 'game-over

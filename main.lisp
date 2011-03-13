@@ -132,7 +132,7 @@
 		      (incf y-offset (tcod:console-print-rect-ex tcod:*root*
 								 0
 								 y-offset
-								 +screen-width+
+								 (- +screen-width+ 4)
 								 (- +ui-top-lines+ y-offset)
 								 :set
 								 :left
@@ -322,6 +322,8 @@
 				    (query-confirm
 				     "Play again?"
 				     #'(lambda ()
+					 (setf *game-input-hooks-stack* nil)
+					 (push-hooks (make-standard-input-hooks))
 					 (initialize-first-game))
 				     #'(lambda ()
 					 (return-from main-game))))))))))

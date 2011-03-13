@@ -40,12 +40,11 @@
 	     :dodge-multiplier 0
 	     :max-hp 100
 	     :darkness-regenerating t
-	     :light-vulnerable t)))
+	     :light-vulnerable t
+	     :ai #'ai-boss-shadowlord)))
     (install-hook rv
 		  :before-death
 		  #'show-game-ending)
-    (install-stateai rv
-		     #'ai-boss-shadowlord)
     rv))
 
 (defun make-bat ()
