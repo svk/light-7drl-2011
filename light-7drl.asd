@@ -17,11 +17,13 @@
 			:depends-on ("package" "rolls" "world-structs"))
 		 (:file "creature"
 			:depends-on ("ai" "rolls" "world-structs" "grammar" "package" "globals"))
-		 (:file "monsters"
-			:depends-on ("ai" "rolls" "creature"))
 		 (:file "item"
 			:depends-on ("package" "globals" "world-structs"))
+		 (:file "monsters"
+			:depends-on ("package" "ai" "rolls" "creature"))
+		 (:file "items"
+			:depends-on ("package" "item" "rolls" "grammar"))
 		 (:file "world"
-			:depends-on ("monsters" "item" "visuals" "ai" "rolls" "world-structs" "grammar" "creature" "package" "globals"))
+			:depends-on ("monsters" "items" "item" "visuals" "ai" "rolls" "world-structs" "grammar" "creature" "package" "globals"))
 		 (:file "main"
 			:depends-on ("ai" "item" "world-structs" "grammar" "creature" "package" "globals" "world"))))

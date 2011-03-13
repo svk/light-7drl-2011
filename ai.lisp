@@ -163,22 +163,27 @@
   (setf (creature-ai creature)
 	(apply ai-f (cons creature rest))))
 
-(defun stateai-harmless-until-provoked (creature delay &key (cooldown-while-visible nil) (enrage-message t) (calm-message t))
+(defun emit-ai-message (creature argument default)
+  (unless (not (alive? creature))
+    (cond ((stringp argument)
+	   (emit-visual creature argument))
+	  (argument (emit-visual creature default)))))
+
+(defun stateai-harmless-until-provoked (creature delay &key (cooldown-while-visible nil) (enrage-message t) (calm-message t) (enraged-behaviour #'ai-fair-search-player-and-destroy))
   (let ((state :harmless)
 	(cooldown nil))
     (install-hook creature
 		  :after-attacked
 		  #'(lambda (attacker)
-		      (unless (not (alive? creature))
-			(unless (not (eq attacker *game-player*))
-			  (unless (eq state :provoked)
-			    (unless (not enrage-message)
-			      (emit-visual creature
+		      (unless (not (eq attacker *game-player*))
+			(unless (eq state :provoked)
+			  (emit-ai-message creature
+					   enrage-message
 					   (format nil
 						   "~a becomes enraged!"
 						   (definite-noun (creature-name creature))))))
-			  (setf state :provoked
-				cooldown delay)))))
+		      (setf state :provoked
+			    cooldown delay)))
     #'(lambda (creature)
 	(case state
 	  (:harmless (ai-random-walk creature))
@@ -186,12 +191,13 @@
 	   (flet ((dec-cooldown ()
 		    (decf cooldown)
 		    (if (<= cooldown 0)
-			(setf state :harmless)
-			(unless (not calm-message)
-			  (emit-visual creature
-				       (format nil
-					       "~a calms down."
-					       (definite-noun (creature-name creature))))))))
+			(progn
+			  (setf state :harmless)
+			  (emit-ai-message creature
+					   calm-message
+					   (format nil
+						   "~a calms down."
+						   (definite-noun (creature-name creature))))))))
 	     (if cooldown-while-visible
 		 (dec-cooldown))
 	     (cond ((not (visible-to? *game-player* creature))
@@ -199,12 +205,66 @@
 		      (dec-cooldown)))
 		   ((ai-trigger-imperfection?)
 		    (ai-random-walk creature))
-		   (t (ai-search-player-and-destroy creature)))))))))
+		   (t (funcall enraged-behaviour creature)))))))))
+
+(defun stateai-harmless-until-approached (creature delay &key radius (cooldown-while-visible nil) (enrage-message t) (calm-message t) (enraged-behaviour #'ai-fair-search-player-and-destroy))
+  (let ((state :harmless)
+	(cooldown nil))
+    (flet ((provoke ()
+	     (unless (eq state :provoked)
+	       (emit-ai-message creature
+				enrage-message
+				(format nil
+					"~a becomes enraged!"
+					(definite-noun (creature-name creature)))))
+	     (setf state :provoked
+		   cooldown delay)))
+      (install-hook creature
+		    :after-attacked
+		    #'(lambda (attacker)
+			(unless (not (alive? creature))
+			  (unless (not (eq attacker *game-player*))
+			    (provoke)))))
+      #'(lambda (creature)
+	  (if (and
+	       (<=
+		(distance (creature-x creature) (creature-y creature)
+			  (creature-x *game-player*) (creature-y *game-player*))
+		radius)
+	       (visible-to? *game-player* creature))
+	      (provoke))
+	  (case state
+	    (:harmless (ai-random-walk creature))
+	    (:provoked
+	     (flet ((dec-cooldown ()
+		      (decf cooldown)
+		      (if (<= cooldown 0)
+			  (progn
+			    (setf state :harmless)
+			    (emit-ai-message creature
+					     calm-message
+					     (format nil
+						     "~a calms down."
+						     (definite-noun (creature-name creature))))))))
+	       (if cooldown-while-visible
+		   (dec-cooldown))
+	       (cond ((not (visible-to? *game-player* creature))
+		      (unless cooldown-while-visible
+			(dec-cooldown)))
+		     ((ai-trigger-imperfection?)
+		      (ai-random-walk creature))
+		     (t (funcall enraged-behaviour creature))))))))))
     
 (let ((ai-success-chance (make-chance-roll :success-chance 6/7)))
   (defun ai-trigger-imperfection? ()
     (not (roll-success? ai-success-chance))))
 
+(defun ai-attack-player-if-adjacent (creature &key (otherwise #'ai-random-walk))
+  (let ((target *game-player*))
+    (cond ((adjacent-to? target creature)
+	   (melee-attack target creature))
+	  (t
+	   (funcall otherwise creature)))))
 
 (defun ai-search-player-and-destroy (creature)
   (let ((target *game-player*))

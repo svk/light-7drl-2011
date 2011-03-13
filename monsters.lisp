@@ -1,5 +1,50 @@
 (in-package :light-7drl)
 
+(defnoun n-glowbug "a" "glow-bug" "glow-bugs")
+(defnoun n-rat "a" "rat" "rats")
+(defnoun n-snake "a" "viper" "vipers")
+
+(defun make-snake ()
+  (let ((rv (make-creature
+	     :appearance (make-appearance :glyph (char-code #\~)
+					  :foreground-colour '(25 200 25))
+	     :name n-snake
+	     :gender nil
+	     :hit-chance (make-chance-roll :success-chance 3/4)
+	     :damage (make-dice-roll :number-of-dice 1
+				     :dice-size 4)
+	     :dodge-multiplier 1/2
+	     :max-hp 5)))
+    (install-stateai rv
+		     #'stateai-harmless-until-approached
+		     10
+		     :cooldown-while-visible t
+		     :enrage-message (format nil "~a hisses loudly!" (definite-noun n-snake))
+		     :calm-message (format nil "~a calms down." (definite-noun n-snake))
+		     :radius 4
+		     :enraged-behaviour #'ai-attack-player-if-adjacent)
+    rv))
+
+(defun make-rat ()
+  (let ((rv (make-creature
+	     :appearance (make-appearance :glyph (char-code #\.)
+					  :foreground-colour '(200 25 25))
+	     :name n-rat
+	     :gender nil
+	     :hit-chance (make-chance-roll :success-chance 3/4)
+	     :damage (make-dice-roll :number-of-dice 1
+				     :dice-size 4)
+	     :dodge-multiplier 1/2
+	     :max-hp 5)))
+    (install-stateai rv
+		     #'stateai-harmless-until-approached
+		     10
+		     :cooldown-while-visible t
+		     :enrage-message nil
+		     :calm-message nil
+		     :radius 4)
+    rv))
+
 (defun make-glowbug ()
   (let ((rv (make-creature
 	     :appearance (make-appearance :glyph (char-code #\.)
@@ -19,6 +64,3 @@
 		     :enrage-message nil
 		     :calm-message nil)
     rv))
-
-				
-  

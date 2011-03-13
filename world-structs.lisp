@@ -41,7 +41,9 @@
   ((appearance :accessor item-appearance
 	       :initarg :appearance)
    (name :accessor item-name
-	 :initarg :name)))
+	 :initarg :name)
+   (heavy :initarg :heavy
+	  :initform nil)))
 
 (defclass creature (radiant)
   ((appearance :accessor creature-appearance

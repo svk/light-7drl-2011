@@ -5,6 +5,9 @@
 	 (cons 'item
 	       rest)))
 
+(defun make-weapon (&rest rest)
+  (apply #'make-item rest))
+
 (defmethod drop-at ((item item) new-level x y)
   (with-slots (level light-source)
       item

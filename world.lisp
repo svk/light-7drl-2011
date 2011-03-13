@@ -514,7 +514,7 @@
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
     (debug-print 50 "what the fuck should spawn creature")
     (dotimes (i 5)
-	(spawn-creature (make-glowbug) *game-current-level*))
+	(spawn-creature (make-snake) *game-current-level*))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
@@ -559,7 +559,6 @@
       (let ((fov-map (level-acquire-obstacle-map level)))
 	(add-light-from-source light-source fov-map)
 	(level-release-obstacle-map level fov-map)))))
-
 
 
 
