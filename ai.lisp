@@ -160,17 +160,24 @@
    (select-random *directions*)))
 
 (defun ai-seek-darkness (creature)
-  (let ((level (object-level creature))
-	(x (creature-x creature))
-	(y (creature-y creature)))
-    (ai-random-walk-restricted
-     creature
-     #'(lambda (xys)
-	 (let ((target-light (apply #'min (mapcar #'(lambda (xy) (tile-lighting (tile-at level (+ x (car xy)) (+ y (cdr xy))))) xys))))
-	   (remove-if-not
-	    #'(lambda (v) (eql v target-light))
-	    xys
-	    :key #'(lambda (xy) (tile-lighting (tile-at level (+ x (car xy)) (+ y (cdr xy)))))))))))
+  (let ((tac-view (find-reachable-tiles creature 5)))
+    (flet ((get-lighting (list) (tile-lighting (third list))))
+      (let ((minimal-lighting (apply #'min (mapcar #'get-lighting tac-view))))
+	(let ((minimal-lists (remove-if-not
+			      #'(lambda (z) (equal z minimal-lighting))
+			      tac-view
+			      :key #'get-lighting)))
+	  (let ((selected-list (select-random minimal-lists)))
+	    (debug-print 50 "~a selected list: ~a~%" creature selected-list)
+	    (let ((selected-step (second selected-list)))
+	      (unless (null selected-step)
+		(try-move-creature creature
+				   (- (car selected-step)
+				      (creature-x creature))
+				   (- (cdr selected-step)
+				      (creature-y creature)))))))))))
+
+           
 
 (defun xy-is-wall? (xy)
   (let ((level (object-level *game-player*)))
@@ -203,7 +210,6 @@
       (do ((qe (car q) (car q))
 	   (q (cdr q) (cdr q)))
 	  ((null qe) (extract-values a))
-	(debug-print 50 "Popped ~a [~a]~%" qe (aref a (car qe) (cdr qe)))
 	(dolist (nxy (remove-if xy-is-obstacle? (neighbours-of (car qe) (cdr qe))))
 	  (let ((old-value (aref a (car qe) (cdr qe)))
 		(n-x (car nxy))
