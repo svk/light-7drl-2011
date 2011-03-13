@@ -1,1 +1,9 @@
-A seven-day roguelike.
+kaw's 7DRL 2011
+
+Control scheme hints (the game is otherwise undocumented):
+    'a' uses a dungeon feature
+    'x' uses an inventory item (slots listed at bottom of screen)
+        [ drink potions, snuff out / light braziers and torches, etc. ]
+    ',' picks up something from the ground
+
+    Vi keys or numpad move
