@@ -13,6 +13,11 @@
       roll
   (format stream "[~,2F%]" (coerce (* 100 success-chance) 'float))))
 
+(defun multiply-chance-by (croll scalar)
+  (make-chance-roll
+   :success-chance (* scalar (chance-roll-success-chance croll))))
+	
+
 (defmethod print-object ((roll dice-roll) stream)
   (with-slots (number-of-dice dice-size constant)
       roll

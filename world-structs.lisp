@@ -76,5 +76,7 @@
 	  :initform 1)
    (hooks :initform (make-hash-table))
    (light-source :initform nil
-		 :initarg :light-source)))
+		 :initarg :light-source)
+   (dodge-multiplier :initform 1
+		     :initarg :dodge-multiplier)))
 	  

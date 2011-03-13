@@ -1,6 +1,6 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil))
+(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil) (dodge-multiplier 1))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
@@ -15,6 +15,7 @@
 		 :miss-verb miss-verb
 		 :hit-verb hit-verb
 		 :speed speed
+		 :dodge-multiplier dodge-multiplier
 		 :light-source (if light-intensity
 				   (make-light-source
 				    :x nil
@@ -129,7 +130,9 @@
 (defmethod melee-attack ((target creature) (attacker creature))
   (with-slots (base-hit-chance base-damage attack-verb hit-verb miss-verb)
       attacker
-    (let ((hit-chance base-hit-chance)
+    (let ((hit-chance (with-slots (dodge-multiplier)
+			  target
+			(multiply-chance-by base-hit-chance dodge-multiplier)))
 	  (dice-roll base-damage)
 	  (player-visible (or (visible-to? target *game-player*)
 			      (visible-to? attacker *game-player*)))

@@ -86,6 +86,8 @@
 (defnoun n-monster "a" "monster" "monsters")
 (defnoun-uncountable n-tea "tea")
 
+(defnoun n-glowbug "a" "glow-bug" "glow-bugs")
+
 (defnoun-uncountable n-he "he" nil)
 (defnoun-uncountable n-she "she" nil)
 (defnoun-uncountable n-it "it" nil)

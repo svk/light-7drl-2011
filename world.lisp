@@ -507,24 +507,8 @@
 			:y (player-y)
 			:intensity 0)) ;; Player should not generally carry a torch, but handy for debugging
     (debug-print 50 "what the fuck should spawn creature")
-    (dotimes (i 10)
-      (let ((monster (make-creature
-		      :appearance (make-appearance :glyph (char-code #\~)
-						   :foreground-colour '(0 0 0))
-		      :name n-monster
-		      :speed 1
-		      :max-hp 50
-		      :hit-chance (make-chance-roll :success-chance 3/4)
-		      :damage (make-dice-roll :number-of-dice 1
-					      :dice-size 6
-					      :constant 4)
-		      :light-intensity 0.2
-		      :darkvision t)))
-	(debug-print 50 "created unspawned creature: ~a.~%" monster)
-	(install-stateai monster
-			 #'stateai-harmless-until-provoked
-			 10)
-	(spawn-creature monster *game-current-level*)))
+    (dotimes (i 5)
+	(spawn-creature (make-glowbug) *game-current-level*))
     (debug-print 50 "what the fuck should have spawned creature")
     (creature-give *game-player*
 		   (make-item :appearance (make-appearance :glyph +weapon-glyph+
