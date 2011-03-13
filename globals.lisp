@@ -178,7 +178,15 @@
   (declare (ignore value)
 	   (ignore stack)))
 
-(defun query-string (description f-string &key (filter #'identity) (limit nil) (accept #'any-nonempty))
+(defun letter-filter (ch)
+  (if (or
+       (eq :enter ch)
+       (eq :backspace ch)
+       (and (characterp ch)
+	    (both-case-p ch)))
+      ch))
+
+(defun query-string (description f-string &key (filter #'letter-filter) (limit nil) (accept #'any-nonempty))
   (let ((buffer nil))
     (defun make-buffer-string ()
       (let ((rv (make-array 0

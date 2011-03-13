@@ -16,8 +16,10 @@
       (tcod:console-flush)))
 
 (defun make-game-over-death-screen (condition)
-  (make-centered-text-special-screen "Game over: you died. Better luck next time!" '(128 128 128) '(0 0 0)))
+  (declare (ignore condition))
+  (make-centered-text-special-screen "Game over. Better luck next time!" '(215 23 45) '(93 24 25)))
 
 (defun make-game-over-victory-screen (condition)
-  (make-centered-text-special-screen "Congratulations! You've won the game!" '(255 255 255) '(128 0 128)))
+  (declare (ignore condition))
+  (make-centered-text-special-screen "Congratulations! You've won the game!" '(207 180 214) '(143 93 166)))
   

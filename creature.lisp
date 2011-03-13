@@ -1,6 +1,6 @@
 (in-package :light-7drl)
 
-(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1))
+(defun make-creature (&key appearance name max-hp ai gender damage hit-chance (hp nil) (darkvision nil) (attack-verb v-attack) (miss-verb v-miss) (hit-verb v-hit) (speed 1) (light-intensity nil))
   (make-instance 'creature
 		 :appearance appearance
 		 :name name
@@ -14,14 +14,27 @@
 		 :attack-verb attack-verb
 		 :miss-verb miss-verb
 		 :hit-verb hit-verb
-		 :speed speed))
-
+		 :speed speed
+		 :light-source (if light-intensity
+				   (make-light-source
+				    :x nil
+				    :y nil
+				    :intensity light-intensity))))
 
 (defmethod tick ((creature creature))
   (with-slots (speed ai)
       creature
     (dotimes (i speed)
       (funcall ai creature))))
+
+(defmethod emit-light ((creature creature))
+  (with-slots (light-source level)
+      creature
+    (unless (null light-source)
+      (debug-print 50 "Creature ~a is emitting light.~%" creature)
+      (let ((fov-map (level-acquire-obstacle-map level)))
+	(add-light-from-source light-source fov-map)
+	(level-release-obstacle-map level fov-map)))))
 
 (defmethod set-position ((creature creature) x y level)
   (debug-print 50 "Creature ~a is on ~a, moving to ~a ~a ~a.~%" creature (creature-level creature) x y level)
@@ -34,6 +47,10 @@
   (unless (null (creature-tile creature))
     (setf (tile-creature (creature-tile creature)) nil))
   (invalidate-fov creature)
+  (with-slots (light-source)
+      creature
+    (unless (null light-source)
+      (move-light-source light-source x y)))
   (with-slots (stepmap-to)
       creature
     (setf stepmap-to nil))

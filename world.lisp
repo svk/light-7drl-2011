@@ -269,14 +269,20 @@
 
 (defun update-world ()
   (clear-lighting)
+  (dolist (creature (level-creatures *game-current-level*))
+    (emit-light creature))
   (let ((fov-map (level-acquire-obstacle-map *game-current-level*)))
+    (debug-print 10 "omap comin': ~a~%" fov-map)
     (add-light-from-source *game-torch* fov-map)
-    (dolist (brazier *game-braziers*)
-      (add-light-from-source brazier fov-map))
     (level-release-obstacle-map *game-current-level* fov-map)))
   
 
 (defun tick-world ()
+  ;; Notice a that could theoretically come back to bite me, but hopefully will
+  ;; not within the next 24 hours: lighting, etc., is updated only once per
+  ;; turn, while light sources might move several times during a turn. Lighting
+  ;; might be in an inconsistent state during a turn (inconsistent with the
+  ;; light sources).
   (tick-creatures (level-creatures *game-current-level*))
   (debug-print 50 "Ticking.~%")
   (update-world))
@@ -492,10 +498,10 @@
 		      (signal 'game-over
 			      :type :death)))
     (debug-print 50 "Game-player is now: ~a.~%" *game-player*)
-    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
-      (dolist (ls light-sources)
-	(push ls *game-braziers*))
-      (debug-print 50 "Generated light sources: ~a.~%" light-sources))
+;    (let ((light-sources (generate-light-source-cover *game-current-level* (const 0.5) 1 t)))
+;      (dolist (ls light-sources)
+;	(push ls *game-braziers*))
+;      (debug-print 50 "Generated light sources: ~a.~%" light-sources))
     (setf *game-torch* (make-light-source
 			:x (player-x)
 			:y (player-y)
@@ -512,6 +518,7 @@
 		      :damage (make-dice-roll :number-of-dice 1
 					      :dice-size 6
 					      :constant 4)
+		      :light-intensity 0.2
 		      :darkvision t)))
 	(debug-print 50 "created unspawned creature: ~a.~%" monster)
 	(install-stateai monster

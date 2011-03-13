@@ -74,5 +74,7 @@
    (miss-verb :initarg :miss-verb)
    (speed :initarg :speed
 	  :initform 1)
-   (hooks :initform (make-hash-table))))
+   (hooks :initform (make-hash-table))
+   (light-source :initform nil
+		 :initarg :light-source)))
 	  
