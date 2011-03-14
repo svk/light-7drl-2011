@@ -5,9 +5,14 @@
 (in-package :light-7drl)
 
 (cffi:define-foreign-library libtcod
-    (t (:default "libtcod")))
+    #-windows
+    (t (:default "libtcod")
+    #+windows
+    (t (:default "libtcod-mingw")
+    ))
 
 (defun terminate ()
+  #-windows
   (handler-case
       (progn
 	(defcfun "TCOD_sys_term" :void)
@@ -15,7 +20,10 @@
     (sb-kernel::undefined-alien-function-error ())))
 
 (defun load-libraries ()
+  #-windows
   (cffi:load-foreign-library 'libtcod :search-path "libtcod.so")
+  #+windows
+  (cffi:load-foreign-library 'libtcod :search-path "libtcod-mingw.dll")
   (setf tcod:*root* (null-pointer)))
 
 (defun close-libraries ()
@@ -255,9 +263,6 @@
   ;; Later, we might not be moving the player, but, say, a cursor.
   (try-move-player dx dy))
 
-(defmacro toggle (variable)
-  `(setf ,variable (not ,variable)))
-
 (defun make-standard-input-hooks ()
   #'(lambda (value stack)
       (let ((movement-xy (translate-movement-input value)))
@@ -347,7 +352,11 @@
    filename
    :executable t
    :toplevel #'(lambda ()
+         #-windows
 		 (setf *random-state* (make-random-state t))
+         #+windows
+         (setf *random-state* (sb-ext:seed-random-state (+ (get-internal-real-time)
+                                                           (get-universal-time))))
 		 (initialize-libtcod)
 		 (start-game))
    :purify t))

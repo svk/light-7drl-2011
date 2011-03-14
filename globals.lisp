@@ -278,3 +278,6 @@
 	 nil)
 	(t (cons (cons (car a) (car b)) (zip (cdr a) (cdr b))))))
 
+(defmacro toggle (variable)
+  `(setf ,variable (not ,variable)))
+
