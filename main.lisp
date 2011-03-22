@@ -6,10 +6,9 @@
 
 (cffi:define-foreign-library libtcod
     #-windows
-    (t (:default "libtcod")
+    (t (:default "libtcod"))
     #+windows
-    (t (:default "libtcod-mingw")
-    ))
+    (t (:default "libtcod-mingw")))
 
 (defun terminate ()
   #-windows
