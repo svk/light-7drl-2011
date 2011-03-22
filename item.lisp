@@ -76,6 +76,7 @@
        (if (not (get-status *game-player* :poison))
 	   (buffer-show "You drink ~a. Nothing happens." (definite-noun name))
 	   (buffer-show "You drink ~a. You feel better." (definite-noun name)))
+       (remove-status *game-player* :poison)
        (consume-item *game-player* item)
        (player-took-action))
       (t (buffer-show "You're not sure how you could make use of ~a right now."
